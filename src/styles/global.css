@@ -1,0 +1,1143 @@
+:root {
+  /* Fixed in both themes: the blue hero and the night-blue cluster section. */
+  --blue: #1b3bd0;
+  --blue-deep: #142ea6;
+  --on-blue: #ffffff;
+  --on-blue-soft: #d5ddff;
+  --night: #0a0f26;
+  --night-line: #2c3877;
+  --on-night: #e9ecfa;
+  --on-night-soft: #aab3d6;
+  --signal: #ffc531;
+
+  --ground: #f7f7f4;
+  --ink: #14161b;
+  --muted: #535a63;
+  --rule: #d7d9d3;
+  --link: #1b3bd0;
+
+  --col-when: 13rem;
+  --gap: 2.5rem;
+  --pad: clamp(1.25rem, 5vw, 3rem);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #10131a;
+    --ink: #eceef2;
+    --muted: #a3abb8;
+    --rule: #2a303b;
+    --link: #a9bcff;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scrollbar-color: var(--muted) var(--ground);
+  scroll-behavior: smooth;
+  /* Keeps jump targets clear of the sticky bar. */
+  scroll-padding-top: 4rem;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: 'Public Sans Variable', system-ui, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  font-variant-numeric: lining-nums;
+}
+
+::selection {
+  background: var(--signal);
+  color: #14161b;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+dl,
+dd {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* On the blue and night surfaces a ring in the text colour can vanish (the
+   white email button has blue text on blue), so those use the signal yellow. */
+.top a:focus-visible,
+.hero a:focus-visible,
+.foot a:focus-visible,
+.cluster summary:focus-visible {
+  outline-color: var(--signal);
+}
+
+/* Text for screen readers only. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.wrap {
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: var(--pad);
+}
+
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 10;
+  padding: 0.5rem 0.75rem;
+  background: var(--signal);
+  color: #14161b;
+}
+
+.skip:focus {
+  top: 1rem;
+}
+
+.lead {
+  font-size: clamp(1.15rem, 2vw, 1.3rem);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.ticks li {
+  position: relative;
+  padding-left: 1.25rem;
+  text-wrap: pretty;
+}
+
+.ticks li + li {
+  margin-top: 0.45rem;
+}
+
+.ticks li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.8em;
+  width: 0.5rem;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+/* Hero */
+
+.hero {
+  background: var(--blue);
+  color: var(--on-blue);
+  /* Extra room at the bottom: the screenshot overlaps it. */
+  padding-block: clamp(2rem, 5vw, 3.5rem) clamp(9rem, 20vw, 15rem);
+}
+
+/* Section links and a contact link, pinned to the top of the window. On the
+   hero it is the same blue, so it only reads as a bar once you scroll. */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--blue);
+}
+
+.top-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.25rem;
+}
+
+.top ul {
+  display: flex;
+  column-gap: clamp(1.1rem, 3vw, 2rem);
+  /* Pull the first link's padding back so its text sits on the page edge. */
+  margin-left: -0.15rem;
+  /* Narrow screens: the links scroll sideways instead of wrapping. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.top ul::-webkit-scrollbar {
+  display: none;
+}
+
+.top a {
+  display: inline-block;
+  padding: 0.7rem 0.15rem;
+  color: var(--on-blue);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.top a:hover {
+  color: var(--signal);
+  text-decoration: underline 2px;
+}
+
+.top .top-contact {
+  flex: none;
+  padding: 0.7rem 0.95rem;
+  border: 1.5px solid var(--on-blue);
+  border-radius: 999px;
+  font-weight: 650;
+  line-height: 1.2;
+  transition:
+    background-color 200ms var(--ease),
+    color 200ms var(--ease);
+}
+
+.top .top-contact:hover {
+  border-color: var(--signal);
+  background: var(--signal);
+  color: #14161b;
+  text-decoration: none;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: end;
+}
+
+h1 {
+  font-size: clamp(3rem, 9.5vw, 6rem);
+  font-weight: 800;
+  line-height: 0.94;
+  letter-spacing: -0.04em;
+  animation: rise 600ms var(--ease) both;
+}
+
+.summary {
+  margin-top: 1.75rem;
+  max-width: 36rem;
+  font-size: clamp(1.15rem, 2.1vw, 1.35rem);
+  line-height: 1.45;
+  color: var(--on-blue-soft);
+  text-wrap: pretty;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2.25rem;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.7rem 1.15rem;
+  border: 1.5px solid var(--on-blue);
+  border-radius: 999px;
+  color: var(--on-blue);
+  font-weight: 650;
+  line-height: 1.2;
+  text-decoration: none;
+  transition:
+    background-color 200ms var(--ease),
+    color 200ms var(--ease),
+    transform 200ms var(--ease);
+}
+
+.btn.solid {
+  background: var(--on-blue);
+  color: var(--blue);
+}
+
+.btn:hover {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #14161b;
+  transform: translateY(-2px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.now {
+  padding-bottom: 0.25rem;
+}
+
+.portrait-fig {
+  margin: 0 0 1.75rem;
+}
+
+.portrait {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  border-radius: 0.5rem;
+  object-fit: cover;
+}
+
+.portrait-fig figcaption {
+  margin-top: 0.5rem;
+  color: var(--on-blue-soft);
+  font-size: 0.875rem;
+}
+
+.portrait.slot {
+  border-color: var(--on-blue-soft);
+  background: repeating-linear-gradient(135deg, transparent 0 14px, rgb(255 255 255 / 0.16) 14px 15px);
+  color: var(--on-blue);
+}
+
+.now h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--on-blue);
+}
+
+.now li {
+  padding-block: 0.8rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.35);
+}
+
+.now-what {
+  display: block;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.now-where,
+.now-place {
+  color: var(--on-blue-soft);
+  font-size: 0.9375rem;
+}
+
+.now-place {
+  margin-top: 0.8rem;
+}
+
+/* Featured platforms */
+
+.showcase {
+  padding-bottom: clamp(3.5rem, 8vw, 6rem);
+}
+
+.showcase-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: start;
+}
+
+.shots {
+  margin-top: calc(-1 * clamp(6.5rem, 15vw, 11.5rem));
+}
+
+/* The second view sits over the lower right corner of the first. */
+.shot-2 {
+  position: relative;
+  width: 58%;
+  margin: -20% -3% 0 auto;
+  border: 1px solid #3a3a3a;
+}
+
+.shot {
+  display: block;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #1f1f1f;
+  box-shadow:
+    0 1px 2px rgb(8 12 40 / 0.25),
+    0 18px 40px -12px rgb(8 12 40 / 0.45),
+    0 40px 80px -30px rgb(8 12 40 / 0.5);
+  transition: transform 500ms var(--ease);
+}
+
+.shot:hover {
+  transform: translateY(-6px);
+}
+
+/* Yellow ring with a dark band inside it, so it shows on the light ground,
+   the dark ground and the blue hero alike. */
+.shot:focus-visible {
+  outline: 3px solid var(--signal);
+  outline-offset: 4px;
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 4px #14161b;
+}
+
+.showcase h2,
+.cluster h2 {
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.showcase-text {
+  padding-top: 2.5rem;
+}
+
+.showcase-text .lead,
+.visit .lead {
+  margin-top: 1rem;
+}
+
+.showcase .ticks {
+  margin-top: 1.25rem;
+  color: var(--muted);
+}
+
+.go {
+  display: inline-block;
+  margin-top: 1rem;
+  /* Padding makes the link a comfortable tap target. */
+  padding-block: 0.5rem;
+  font-weight: 650;
+}
+
+.go::after {
+  content: '';
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  margin-left: 0.45em;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-0.05em);
+  transition: translate 200ms var(--ease);
+}
+
+.go:hover::after {
+  translate: 0.2em 0;
+}
+
+.visit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: center;
+  margin-top: clamp(3rem, 7vw, 5rem);
+  padding-top: clamp(2rem, 5vw, 3rem);
+}
+
+.visit > div {
+  max-width: 40rem;
+}
+
+.visit-shot {
+  margin-top: 0;
+  /* The screenshot is as dark as the dark-theme ground; give it an edge. */
+  border: 1px solid var(--rule);
+}
+
+/* Plain list sections */
+
+.plain .wrap {
+  padding-block: 3rem 3.5rem;
+}
+
+/* Wide screens: the section title sits in a left rail and stays in view
+   while its entries scroll past. */
+@media (min-width: 60.0625rem) {
+  .plain .wrap {
+    display: grid;
+    grid-template-columns: var(--col-when) minmax(0, 1fr);
+    column-gap: var(--gap);
+    align-items: start;
+  }
+
+  .plain .wrap > h2 {
+    position: sticky;
+    top: 4.75rem;
+  }
+
+  .plain .entries,
+  .plain .skills {
+    margin-top: 0.2rem;
+  }
+}
+
+/* Section rule, drawn inside the page padding so it lines up with the text. */
+.plain .wrap,
+.visit {
+  position: relative;
+}
+
+.plain .wrap::before,
+.visit::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  inset-inline: var(--pad);
+  border-top: 2px solid var(--ink);
+}
+
+/* Music */
+
+.music {
+  padding-block: clamp(3.5rem, 8vw, 6rem);
+}
+
+.music h2 {
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.music .lead {
+  margin-top: 1rem;
+  max-width: 40rem;
+}
+
+.music-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: clamp(2.5rem, 7vw, 6rem);
+  margin-top: clamp(2rem, 5vw, 3rem);
+}
+
+.sub {
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--ink);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.gear li {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Product cut-outs on a faint tile, so dark gear stays visible on the dark theme. */
+.gear img {
+  flex: none;
+  width: 6.5rem;
+  height: 6.5rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  object-fit: contain;
+}
+
+.gear div,
+.record-cap {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.gear span,
+.record-cap span {
+  color: var(--muted);
+}
+
+/* Records: a sleeve with the disc showing at its right edge. Until there is
+   a cover photo, the sleeve carries the title and artist in type. */
+.records {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.75rem clamp(1rem, 3vw, 2rem);
+  margin-top: 1.5rem;
+}
+
+.record {
+  position: relative;
+  width: 76%;
+  aspect-ratio: 1;
+}
+
+.sleeve {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--sleeve, #262a35);
+  outline: 1px solid rgb(255 255 255 / 0.1);
+  outline-offset: -1px;
+  color: var(--sleeve-ink, #f7f7f4);
+  box-shadow:
+    0 1px 2px rgb(8 12 40 / 0.3),
+    0 12px 24px -12px rgb(8 12 40 / 0.55);
+}
+
+.sleeve img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sleeve p {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem;
+  line-height: 1.15;
+}
+
+.sleeve strong {
+  font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.sleeve span {
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+
+.disc {
+  position: absolute;
+  inset: 3%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #14161b 0 2.5%, var(--sleeve, #8a93a6) 3% 17%, transparent 17.5%),
+    repeating-radial-gradient(circle, #2e313a 0 2px, #17191e 2px 4px);
+  outline: 1px solid rgb(255 255 255 / 0.3);
+  translate: 24% 0;
+  transition: translate 500ms var(--ease);
+}
+
+.record:hover .disc {
+  translate: 34% 0;
+}
+
+.records li:nth-child(4n + 2) {
+  --sleeve: var(--blue);
+  --sleeve-ink: #ffffff;
+}
+
+.records li:nth-child(4n + 3) {
+  --sleeve: var(--signal);
+  --sleeve-ink: #14161b;
+}
+
+.records li:nth-child(4n + 4) {
+  --sleeve: #dfe3f5;
+  --sleeve-ink: #0a0f26;
+}
+
+.record-cap {
+  margin-top: 0.65rem;
+}
+
+/* An empty photo or cover slot. */
+.slot {
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  border: 2px dashed var(--muted);
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 14px,
+    color-mix(in srgb, var(--muted) 14%, transparent) 14px 15px
+  );
+  color: var(--muted);
+  font-weight: 650;
+  text-align: center;
+}
+
+/* Filler text that still has to be written. */
+.todo {
+  font-style: italic;
+  text-decoration: underline dashed 1px;
+  text-underline-offset: 0.25em;
+}
+
+.plain .wrap > h2 {
+  font-size: clamp(1.5rem, 2.4vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.entries,
+.skills {
+  margin-top: 1.75rem;
+}
+
+.entry,
+.skills > div {
+  display: grid;
+  column-gap: var(--gap);
+  border-top: 1px solid var(--rule);
+}
+
+/* Title and detail on the left, dates on the right. */
+.entry {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 13rem);
+}
+
+.entry .what {
+  grid-area: 1 / 1;
+}
+
+.entry .when {
+  grid-area: 1 / 2;
+  padding-top: 0.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  text-wrap: balance;
+}
+
+.skills > div {
+  grid-template-columns: 12rem minmax(0, 1fr);
+}
+
+.entry {
+  padding-block: 1.5rem;
+}
+
+.skills > div {
+  padding-block: 0.6rem;
+}
+
+.entry:first-child,
+.skills > div:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.entry:last-child {
+  padding-bottom: 0;
+}
+
+.when,
+.skills dt,
+.org {
+  color: var(--muted);
+}
+
+.what h3 {
+  font-size: 1.25rem;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.org {
+  margin-top: 0.15rem;
+}
+
+.what .ticks {
+  margin-top: 0.85rem;
+  max-width: 42rem;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.5rem;
+  margin-top: 0.9rem;
+}
+
+.links .go {
+  margin-top: 0;
+}
+
+/* Cluster */
+
+.cluster {
+  background: var(--night);
+  color: var(--on-night);
+  padding-block: clamp(3.5rem, 9vw, 6.5rem);
+}
+
+.cluster .lead {
+  margin-top: 1.25rem;
+  max-width: 44rem;
+  color: var(--on-night-soft);
+}
+
+.paths {
+  display: grid;
+  gap: 2.25rem;
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+}
+
+.path h3 {
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--on-night-soft);
+}
+
+.chain {
+  display: flex;
+  margin-top: 0.9rem;
+}
+
+.chain li {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.85rem 0.9rem;
+  border: 1.5px dashed #5f6cb4;
+  border-radius: 0.5rem;
+  font-weight: 650;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.chain li + li {
+  margin-left: clamp(1.25rem, 4vw, 3rem);
+}
+
+/* Connector between two steps. */
+.chain li + li::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: clamp(1.25rem, 4vw, 3rem);
+  height: 2px;
+  margin-right: 1.5px;
+  background: var(--night-line);
+}
+
+.chain li.home {
+  border-style: solid;
+  border-color: #7483d8;
+  background: #161f52;
+}
+
+.chain.live li {
+  border-color: #8f7a2c;
+}
+
+.chain.live li.home {
+  border-color: #c79f33;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.75rem;
+  color: var(--on-night-soft);
+  font-size: 0.9375rem;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.key {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 1.5px dashed #5f6cb4;
+  border-radius: 0.2rem;
+}
+
+.key.home {
+  border-style: solid;
+  border-color: #7483d8;
+  background: #161f52;
+}
+
+.chain.live li:last-child {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #14161b;
+}
+
+.chain.live li + li::before {
+  background: repeating-linear-gradient(90deg, var(--signal) 0 6px, transparent 6px 12px);
+  background-size: 12px 2px;
+  animation: flow 1600ms linear infinite;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: clamp(2rem, 6vw, 5rem);
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+}
+
+.facts > div {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  column-gap: 1.25rem;
+  padding-block: 0.9rem;
+  border-top: 1px solid var(--night-line);
+}
+
+.facts dt {
+  font-weight: 650;
+}
+
+.facts dd {
+  color: var(--on-night-soft);
+  text-wrap: pretty;
+}
+
+.more {
+  margin-top: 0.75rem;
+}
+
+.more summary {
+  width: fit-content;
+  padding-block: 0.65rem;
+  color: var(--on-night);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.more summary:hover {
+  color: var(--signal);
+}
+
+.more .facts {
+  margin-top: 0.5rem;
+}
+
+.cluster ::selection {
+  background: var(--signal);
+}
+
+/* Footer */
+
+.foot {
+  background: var(--blue);
+  color: var(--on-blue);
+  padding-block: clamp(3rem, 7vw, 5rem);
+}
+
+.foot a {
+  color: inherit;
+}
+
+.foot-cta {
+  max-width: 34rem;
+  font-size: clamp(1.5rem, 3.6vw, 2.25rem);
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.foot-cta a {
+  overflow-wrap: anywhere;
+}
+
+.foot-links {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1.25rem;
+  font-weight: 600;
+}
+
+.foot-links a {
+  display: inline-block;
+  padding-block: 0.75rem;
+}
+
+.foot-build {
+  margin-top: 2.5rem;
+  color: var(--on-blue-soft);
+  font-size: 0.875rem;
+}
+
+.foot-build code {
+  font-family: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.95em;
+  color: var(--on-blue);
+}
+
+@keyframes rise {
+  from {
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(0.35em);
+  }
+  to {
+    clip-path: inset(-0.2em -0.2em -0.2em -0.2em);
+    transform: none;
+  }
+}
+
+@keyframes flow {
+  to {
+    background-position: 12px 0;
+  }
+}
+
+@media (max-width: 60rem) {
+  .hero-grid,
+  .showcase-grid,
+  .visit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .showcase-text {
+    padding-top: 0;
+  }
+
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .music-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 44rem) {
+  .top .wide {
+    display: none;
+  }
+
+  .top ul {
+    column-gap: 0.9rem;
+  }
+
+  .entry,
+  .skills > div {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.35rem;
+  }
+
+  /* Dates go back above the title. */
+  .entry .what,
+  .entry .when {
+    grid-area: auto;
+  }
+
+  .entry .when {
+    padding-top: 0;
+    font-size: 0.9375rem;
+    text-align: left;
+  }
+
+  /* Steps stack, connectors turn vertical. */
+  .chain {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chain li + li {
+    margin-left: 0;
+    margin-top: 1.5rem;
+  }
+
+  .chain li + li::before {
+    top: auto;
+    right: auto;
+    bottom: 100%;
+    left: 50%;
+    width: 2px;
+    height: 1.5rem;
+    margin: 0 0 1.5px;
+  }
+
+  .chain.live li + li::before {
+    background: repeating-linear-gradient(180deg, var(--signal) 0 6px, transparent 6px 12px);
+    background-size: 2px 12px;
+    animation-name: flow-down;
+  }
+
+  .facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.15rem;
+  }
+}
+
+@keyframes flow-down {
+  to {
+    background-position: 0 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  h1,
+  .chain.live li + li::before {
+    animation: none;
+  }
+
+  .btn,
+  .top .top-contact,
+  .shot,
+  .disc,
+  .go::after {
+    transition: none;
+  }
+}
+
+@media print {
+  .hero,
+  .foot,
+  .cluster {
+    background: none;
+    color: #000;
+  }
+
+  .shots {
+    margin-top: 0;
+  }
+
+  .shot {
+    box-shadow: none;
+  }
+
+  .skip,
+  .top {
+    display: none;
+  }
+}

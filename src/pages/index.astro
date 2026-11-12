@@ -1,0 +1,422 @@
+---
+import '@fontsource-variable/public-sans';
+import '../styles/global.css';
+import { execSync } from 'node:child_process';
+import { Image } from 'astro:assets';
+import csShot from '../assets/community-solutions.png';
+import csCourseShot from '../assets/community-solutions-course.png';
+import portrait from '../assets/portrait.jpg';
+import visitShot from '../assets/visit.png';
+import gearGuitar from '../assets/gear-guitar.png';
+import gearAmp from '../assets/gear-amp.png';
+import gearInterface from '../assets/gear-interface.png';
+import gearTurntable from '../assets/gear-turntable.png';
+import record1 from '../assets/record-1.jpg';
+import record2 from '../assets/record-2.jpg';
+import record3 from '../assets/record-3.jpg';
+import record4 from '../assets/record-4.jpg';
+import { person, now, featured, cluster, music, work, projects, education, skills } from '../data/site';
+
+const description =
+  'Burak Emir Sezen: software engineer, MSc Computer Science student at ETH Zurich.';
+const cs = featured.communitySolutions;
+
+// Which version this is, fixed at build time. CI passes COMMIT_SHA into the
+// image build; a local build asks git, and falls back to no hash.
+function commitSha(): string | undefined {
+  if (process.env.COMMIT_SHA) return process.env.COMMIT_SHA;
+  try {
+    return execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return undefined;
+  }
+}
+const sha = commitSha();
+const builtOn = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Zurich' });
+
+// Jump links at the top of the page, in page order.
+// `wide` links are left out of the bar on phones, where only three fit.
+const sections = [
+  { href: '#platforms', label: 'Platforms' },
+  { href: '#work', label: 'Work' },
+  { href: '#projects', label: 'Research' },
+  { href: '#education', label: 'Education', wide: true },
+  { href: '#skills', label: 'Skills', wide: true },
+  { href: '#cluster', label: 'Cluster', wide: true },
+];
+
+// Cluster facts shown straight away; the rest sit behind "More about the setup".
+const coreFacts = ['Compute', 'Deploys', 'Workloads', 'Secrets'];
+
+// Photos, keyed by id: `portrait` for the hero, and the ids in `music`
+// (src/data/site.ts) for the music section. Missing ones show a dashed slot.
+// Example: import guitar from "../assets/guitar.jpg"; then add `guitar` here.
+const photos: Record<string, ImageMetadata | undefined> = {
+  portrait,
+  guitar: gearGuitar,
+  amp: gearAmp,
+  interface: gearInterface,
+  turntable: gearTurntable,
+  'record-1': record1,
+  'record-2': record2,
+  'record-3': record3,
+  'record-4': record4,
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{person.name}</title>
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#1b3bd0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={Astro.site} />
+    <meta property="og:title" content={person.name} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="profile" />
+  </head>
+  <body>
+    <a class="skip" href="#platforms">Skip to the work</a>
+
+    <nav class="top" aria-label="Sections">
+      <div class="wrap top-in">
+        <ul>
+          {sections.map((s) => <li class:list={{ wide: s.wide }}><a href={s.href}>{s.label}</a></li>)}
+        </ul>
+        <a class="top-contact" href="#contact">Contact</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-main">
+          <h1>{person.name}</h1>
+          <p class="summary">{person.summary}</p>
+          <ul class="actions">
+            <li><a class="btn solid" href={`mailto:${person.email}`}>{person.email}</a></li>
+            <li><a class="btn" href={person.github} rel="me">GitHub</a></li>
+            <li><a class="btn" href={person.linkedin} rel="me">LinkedIn</a></li>
+          </ul>
+        </div>
+        <div class="now">
+          <figure class="portrait-fig">
+            {
+              photos.portrait ? (
+                <Image
+                  class="portrait"
+                  src={photos.portrait}
+                  alt={`${person.name} on a terrace above the roofs and church towers of Zurich`}
+                  widths={[480, 800, 1200]}
+                  sizes="(min-width: 60rem) 28rem, 100vw"
+                  loading="eager"
+                />
+              ) : (
+                <div class="portrait slot" role="img" aria-label="Photo placeholder: portrait">
+                  <span>Photo: portrait</span>
+                </div>
+              )
+            }
+            {photos.portrait && <figcaption>{person.portraitCaption}</figcaption>}
+          </figure>
+          <h2>Right now</h2>
+          <ul>
+            {
+              now.map((item) => (
+                <li>
+                  <span class="now-what">{item.what}</span>
+                  <span class="now-where">
+                    {item.where}, {item.since}
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
+          <p class="now-place">{person.location}</p>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="platforms" class="showcase" aria-labelledby="cs-h">
+        <div class="wrap showcase-grid">
+          <div class="shots">
+            <a class="shot" href={cs.url} aria-label={`Open ${cs.name}`}>
+              <Image
+                src={csShot}
+                alt={cs.imageAlt}
+                widths={[640, 960, 1600]}
+                sizes="(min-width: 60rem) 44rem, 100vw"
+                loading="eager"
+              />
+            </a>
+            <a class="shot shot-2" href={cs.url} tabindex="-1" aria-hidden="true">
+              <Image
+                src={csCourseShot}
+                alt={cs.courseImageAlt}
+                widths={[480, 800, 1200]}
+                sizes="(min-width: 60rem) 26rem, 60vw"
+              />
+            </a>
+          </div>
+          <div class="showcase-text">
+            <h2 id="cs-h">{cs.name}</h2>
+            <p class="lead">{cs.lead}</p>
+            <ul class="ticks">
+              {cs.points.map((point) => <li>{point}</li>)}
+            </ul>
+            <p><a class="go" href={cs.url}>{cs.urlLabel}</a></p>
+          </div>
+        </div>
+        <div class="wrap visit">
+          <div class="visit-text">
+            <h2>{featured.visit.name}</h2>
+            <p class="lead">{featured.visit.lead}</p>
+            <ul class="ticks">
+              {featured.visit.points.map((point) => <li>{point}</li>)}
+            </ul>
+            <p><a class="go" href={featured.visit.url}>{featured.visit.urlLabel}</a></p>
+          </div>
+          <a class="shot visit-shot" href={featured.visit.url} aria-label={`Open ${featured.visit.name}`}>
+            <Image
+              src={visitShot}
+              alt={featured.visit.imageAlt}
+              widths={[640, 960, 1600]}
+              sizes="(min-width: 60rem) 38rem, 100vw"
+            />
+          </a>
+        </div>
+      </section>
+
+      <section id="work" class="plain" aria-labelledby="work-h">
+        <div class="wrap">
+          <h2 id="work-h">Work</h2>
+          <div class="entries">
+            {
+              work.map((role) => (
+                <article class="entry">
+                  <p class="when">{role.period}</p>
+                  <div class="what">
+                    <h3>{role.title}</h3>
+                    <p class="org">{role.note ? `${role.org}, ${role.note}` : role.org}</p>
+                    <ul class="ticks">
+                      {role.points.map((point) => (
+                        <li>{point}</li>
+                      ))}
+                    </ul>
+                    {role.links && (
+                      <ul class="links">
+                        {role.links.map((link) => <li><a class="go" href={link.url}>{link.label}</a></li>)}
+                      </ul>
+                    )}
+                  </div>
+                </article>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      <section id="projects" class="plain" aria-labelledby="projects-h">
+        <div class="wrap">
+          <h2 id="projects-h">Research and open source</h2>
+          <div class="entries">
+            {
+              projects.map((project) => (
+                <article class="entry">
+                  <p class="when">{project.context}</p>
+                  <div class="what">
+                    <h3>{project.name}</h3>
+                    <ul class="ticks">
+                      {project.points.map((point) => (
+                        <li>{point}</li>
+                      ))}
+                    </ul>
+                    {project.links && (
+                      <ul class="links">
+                        {project.links.map((link) => <li><a class="go" href={link.url}>{link.label}</a></li>)}
+                      </ul>
+                    )}
+                  </div>
+                </article>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      <section id="education" class="plain" aria-labelledby="education-h">
+        <div class="wrap">
+          <h2 id="education-h">Education</h2>
+          <div class="entries">
+            {
+              education.map((item) => (
+                <article class="entry">
+                  <p class="when">{item.period}</p>
+                  <div class="what">
+                    <h3>{item.degree}</h3>
+                    <p class="org">{item.note ? `${item.school}, ${item.note}` : item.school}</p>
+                  </div>
+                </article>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      <section id="skills" class="plain" aria-labelledby="skills-h">
+        <div class="wrap">
+          <h2 id="skills-h">Skills</h2>
+          <dl class="skills">
+            {
+              skills.map((skill) => (
+                <div>
+                  <dt>{skill.group}</dt>
+                  <dd>{skill.items}</dd>
+                </div>
+              ))
+            }
+          </dl>
+        </div>
+      </section>
+
+      <section id="cluster" class="cluster" aria-labelledby="cluster-h">
+        <div class="wrap">
+          <h2 id="cluster-h">The cluster behind this page</h2>
+          <p class="lead">{cluster.lead}</p>
+
+          <div class="paths">
+            <div class="path">
+              <h3>How this page reached you</h3>
+              <ol class="chain live">
+                {cluster.request.map((s) => <li class:list={{ home: s.home }}>{s.step}{s.home && <span class="sr"> (on the home cluster)</span>}</li>)}
+              </ol>
+            </div>
+            <div class="path">
+              <h3>How a change gets deployed</h3>
+              <ol class="chain">
+                {cluster.deploy.map((s) => <li class:list={{ home: s.home }}>{s.step}{s.home && <span class="sr"> (on the home cluster)</span>}</li>)}
+              </ol>
+            </div>
+            <p class="legend">
+              <span><i class="key home"></i>Runs on the home cluster</span>
+              <span><i class="key"></i>Outside it</span>
+            </p>
+          </div>
+
+          <dl class="facts">
+            {
+              cluster.facts
+                .filter((fact) => coreFacts.includes(fact.term))
+                .map((fact) => (
+                  <div>
+                    <dt>{fact.term}</dt>
+                    <dd>{fact.text}</dd>
+                  </div>
+                ))
+            }
+          </dl>
+          <details class="more">
+            <summary>More about the setup</summary>
+            <dl class="facts">
+              {
+                cluster.facts
+                  .filter((fact) => !coreFacts.includes(fact.term))
+                  .map((fact) => (
+                    <div>
+                      <dt>{fact.term}</dt>
+                      <dd>{fact.text}</dd>
+                    </div>
+                  ))
+              }
+            </dl>
+          </details>
+        </div>
+      </section>
+
+      <section id="outside" class="music" aria-labelledby="outside-h">
+        <div class="wrap">
+          <h2 id="outside-h">Outside work: music</h2>
+          <p class="lead">{music.lead}</p>
+
+          <div class="music-grid">
+            <div>
+              <h3 class="sub">{music.gearTitle}</h3>
+              <ul class="gear">
+                {
+                  music.photos.map((item) => (
+                    <li>
+                      {photos[item.id] && (
+                        <Image src={photos[item.id]} alt="" widths={[160, 320]} sizes="6.5rem" />
+                      )}
+                      <div>
+                        <strong>{item.title}</strong>
+                        <span class:list={{ todo: item.placeholder }}>{item.text}</span>
+                      </div>
+                    </li>
+                  ))
+                }
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="sub">{music.recordsTitle}</h3>
+              <ul class="records">
+                {
+                  music.records.map((record) => (
+                    <li>
+                      <div class="record">
+                        <div class="disc" aria-hidden="true" />
+                        <div class="sleeve">
+                          {photos[record.id] ? (
+                            <Image src={photos[record.id]} alt={`${record.title} by ${record.artist}`} widths={[240, 480]} sizes="11rem" />
+                          ) : (
+                            <p class:list={{ todo: record.placeholder }}>
+                              <strong>{record.title}</strong>
+                              <span>{record.artist}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {photos[record.id] && (
+                        <p class="record-cap">
+                          <strong>{record.title}</strong>
+                          <span>{record.artist}</span>
+                        </p>
+                      )}
+                    </li>
+                  ))
+                }
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="contact" class="foot">
+      <div class="wrap">
+        <p class="foot-cta">
+          Hiring, or want to talk about any of this? <a href={`mailto:${person.email}`}>{person.email}</a>
+        </p>
+        <ul class="foot-links">
+          <li><a href={person.github} rel="me">GitHub</a></li>
+          <li><a href={person.linkedin} rel="me">LinkedIn</a></li>
+        </ul>
+        <p class="foot-build">
+          {sha ? (
+            <>
+              This version: commit{' '}
+              {person.source ? <a href={`${person.source}/commit/${sha}`}><code>{sha.slice(0, 7)}</code></a> : <code>{sha.slice(0, 7)}</code>}{`, built ${builtOn}.`}
+            </>
+          ) : (
+            <>This version: local build, {builtOn}.</>
+          )}
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
