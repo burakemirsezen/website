@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-13T00:00:00Z",
+  "title": "Design System: bsezen.com",
+  "extensions": {
+    "colorMeta": {
+      "charcoal-band": { "role": "neutral", "displayName": "Charcoal Band", "canonical": "#211f1d", "tonalRamp": ["#141312", "#211f1d", "#3a3530", "#57514a", "#7a7269", "#a39b90", "#cdc6ba", "#f1ede4"] },
+      "on-band": { "role": "neutral", "displayName": "Band Cream", "canonical": "#f6f3ec" },
+      "on-band-soft": { "role": "neutral", "displayName": "Band Stone", "canonical": "#c2bbaf" },
+      "band-line": { "role": "neutral", "displayName": "Band Seam", "canonical": "#4a443e" },
+      "ember-signal": { "role": "primary", "displayName": "Ember Signal", "canonical": "#e8693a", "tonalRamp": ["#3a1608", "#6a2a10", "#b03c0e", "#d2541f", "#e8693a", "#f0916a", "#f6bea3", "#fbe5da"] },
+      "on-signal": { "role": "neutral", "displayName": "Near-Black Umber", "canonical": "#1c1917" },
+      "warm-paper": { "role": "neutral", "displayName": "Warm Paper", "canonical": "#f6f3ec", "tonalRamp": ["#131211", "#292524", "#57534e", "#8f887d", "#c2bbaf", "#ddd8ce", "#e7e1d5", "#f6f3ec"] },
+      "ink": { "role": "neutral", "displayName": "Umber Ink", "canonical": "#292524" },
+      "muted": { "role": "neutral", "displayName": "Weathered Stone", "canonical": "#57534e" },
+      "rule": { "role": "neutral", "displayName": "Paper Seam", "canonical": "#ddd8ce" },
+      "burnt-link": { "role": "primary", "displayName": "Burnt Orange Link", "canonical": "#b03c0e" },
+      "node-home": { "role": "neutral", "displayName": "Node Home", "canonical": "#3a3530" },
+      "node-outside-edge": { "role": "neutral", "displayName": "Outside Edge", "canonical": "#8a8177" },
+      "node-live-edge": { "role": "primary", "displayName": "Live Edge", "canonical": "#9c5a3c" },
+      "sleeve-paper": { "role": "neutral", "displayName": "Sleeve Paper", "canonical": "#e7e1d5" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The name in the hero only." },
+      "headline": { "displayName": "Headline", "purpose": "Feature section titles: platforms, cluster, music." },
+      "title": { "displayName": "Title", "purpose": "List section titles, sticky in the left rail on wide screens." },
+      "entry": { "displayName": "Entry", "purpose": "Role, project or degree name." },
+      "lead": { "displayName": "Lead", "purpose": "Section opening paragraph and hero summary." },
+      "body": { "displayName": "Body", "purpose": "Running text and bullets." },
+      "label": { "displayName": "Label", "purpose": "Small headings above a 2px rule." },
+      "small": { "displayName": "Small", "purpose": "Nav links, metadata, captions." },
+      "mono": { "displayName": "Mono", "purpose": "Commit hash in the footer only." }
+    },
+    "shadows": [
+      { "name": "screenshot", "value": "0 1px 2px rgb(20 14 8 / 0.25), 0 18px 40px -12px rgb(20 14 8 / 0.45), 0 40px 80px -30px rgb(20 14 8 / 0.5)", "purpose": "Product screenshots. Add 0 0 0 1px #3a3531 in dark mode." },
+      { "name": "sleeve", "value": "0 1px 2px rgb(20 14 8 / 0.3), 0 12px 24px -12px rgb(20 14 8 / 0.55)", "purpose": "Record sleeves." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Every transition." },
+      { "name": "duration-ui", "value": "200ms", "purpose": "Buttons, links, arrows." },
+      { "name": "duration-object", "value": "500ms", "purpose": "Screenshot lift and disc slide." },
+      { "name": "rise", "value": "600ms clip-path reveal + 0.35em rise", "purpose": "Hero name, once on load." },
+      { "name": "flow", "value": "1600ms linear infinite", "purpose": "Dashed connectors on the live request path." }
+    ],
+    "breakpoints": [
+      { "name": "stack", "value": "44rem" },
+      { "name": "collapse", "value": "60rem" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one main action on the charcoal band, usually the email address.",
+      "html": "<div class=\"ds-band\"><a class=\"ds-btn ds-btn-solid\" href=\"#\">hello@bsezen.com</a></div>",
+      "css": ".ds-band { background: #211f1d; padding: 24px; font-family: 'Public Sans Variable', system-ui, sans-serif; } .ds-btn { display: inline-block; padding: 0.7rem 1.15rem; border: 1.5px solid #f6f3ec; border-radius: 999px; color: #f6f3ec; font-weight: 650; line-height: 1.2; text-decoration: none; transition: background-color 200ms cubic-bezier(0.16,1,0.3,1), color 200ms cubic-bezier(0.16,1,0.3,1), transform 200ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-solid { background: #e8693a; border-color: #e8693a; color: #1c1917; } .ds-btn:hover { background: #f6f3ec; border-color: #f6f3ec; color: #211f1d; transform: translateY(-2px); } .ds-btn:active { transform: none; } .ds-btn:focus-visible { outline: 2px solid #e8693a; outline-offset: 3px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary actions on the band: GitHub, LinkedIn.",
+      "html": "<div class=\"ds-band\"><a class=\"ds-btn\" href=\"#\">GitHub</a></div>",
+      "css": ".ds-band { background: #211f1d; padding: 24px; font-family: 'Public Sans Variable', system-ui, sans-serif; } .ds-btn { display: inline-block; padding: 0.7rem 1.15rem; border: 1.5px solid #f6f3ec; border-radius: 999px; color: #f6f3ec; font-weight: 650; line-height: 1.2; text-decoration: none; transition: background-color 200ms cubic-bezier(0.16,1,0.3,1), color 200ms cubic-bezier(0.16,1,0.3,1), transform 200ms cubic-bezier(0.16,1,0.3,1); } .ds-btn:hover { background: #f6f3ec; color: #211f1d; transform: translateY(-2px); } .ds-btn:focus-visible { outline: 2px solid #e8693a; outline-offset: 3px; }"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Sticky charcoal bar with section links and a Contact pill.",
+      "html": "<nav class=\"ds-nav\"><ul><li><a href=\"#\">Platforms</a></li><li><a href=\"#\">Work</a></li><li><a href=\"#\">Cluster</a></li></ul><a class=\"ds-nav-contact\" href=\"#\">Contact</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.25rem 24px; background: #211f1d; font-family: 'Public Sans Variable', system-ui, sans-serif; } .ds-nav ul { display: flex; gap: 2rem; margin: 0; padding: 0; list-style: none; } .ds-nav a { display: inline-block; padding: 0.7rem 0.15rem; color: #f6f3ec; font-size: 0.9375rem; font-weight: 600; text-decoration: none; } .ds-nav ul a:hover { color: #e8693a; text-decoration: underline 2px; text-underline-offset: 0.2em; } .ds-nav-contact { padding: 0.7rem 0.95rem !important; border: 1.5px solid #f6f3ec; border-radius: 999px; font-weight: 650 !important; line-height: 1.2; transition: background-color 200ms cubic-bezier(0.16,1,0.3,1), color 200ms cubic-bezier(0.16,1,0.3,1); } .ds-nav-contact:hover { background: #e8693a; border-color: #e8693a; color: #1c1917 !important; } .ds-nav a:focus-visible { outline: 2px solid #e8693a; outline-offset: 3px; border-radius: 2px; }"
+    },
+    {
+      "name": "Go Link",
+      "kind": "custom",
+      "refersTo": "link-go",
+      "description": "Outbound link with a CSS-drawn arrow, on paper.",
+      "html": "<div class=\"ds-paper\"><a class=\"ds-go\" href=\"#\">Open Community Solutions</a></div>",
+      "css": ".ds-paper { background: #f6f3ec; padding: 24px; font-family: 'Public Sans Variable', system-ui, sans-serif; font-size: 1.0625rem; } .ds-go { display: inline-block; padding-block: 0.5rem; color: #b03c0e; font-weight: 650; text-decoration-thickness: 1px; text-underline-offset: 0.2em; } .ds-go:hover { text-decoration-thickness: 2px; } .ds-go::after { content: ''; display: inline-block; width: 0.55em; height: 0.55em; margin-left: 0.45em; border-top: 2px solid currentColor; border-right: 2px solid currentColor; transform: rotate(45deg) translateY(-0.05em); transition: translate 200ms cubic-bezier(0.16,1,0.3,1); } .ds-go:hover::after { translate: 0.2em 0; } .ds-go:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 2px; }"
+    },
+    {
+      "name": "Entry",
+      "kind": "card",
+      "refersTo": "entry",
+      "description": "A dated row in a list section. No box, separated by rules.",
+      "html": "<div class=\"ds-paper\"><article class=\"ds-entry\"><div><h3>Software engineer</h3><p class=\"ds-org\">VIS, the CS student association at ETH</p><ul class=\"ds-ticks\"><li>Runs the platforms students use every week.</li></ul></div><p class=\"ds-when\">Since 2025</p></article></div>",
+      "css": ".ds-paper { background: #f6f3ec; color: #292524; padding: 24px; font-family: 'Public Sans Variable', system-ui, sans-serif; font-size: 1.0625rem; line-height: 1.6; } .ds-entry { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,13rem); column-gap: 2.5rem; padding-block: 1.5rem; border-top: 1px solid #ddd8ce; } .ds-entry h3 { margin: 0; font-size: 1.25rem; font-weight: 650; line-height: 1.3; letter-spacing: -0.01em; } .ds-org, .ds-when { margin: 0.15rem 0 0; color: #57534e; } .ds-when { text-align: right; font-variant-numeric: tabular-nums; } .ds-ticks { margin: 0.85rem 0 0; padding: 0; list-style: none; } .ds-ticks li { position: relative; padding-left: 1.25rem; } .ds-ticks li::before { content: ''; position: absolute; left: 0; top: 0.8em; width: 0.5rem; height: 2px; background: currentColor; opacity: 0.55; }"
+    },
+    {
+      "name": "Cluster Chain",
+      "kind": "custom",
+      "refersTo": "chain-step",
+      "description": "The live request path: dashed outside nodes, solid home nodes, the arrival node in signal, flowing connectors.",
+      "html": "<div class=\"ds-band\"><ol class=\"ds-chain\"><li>You</li><li>Cloudflare</li><li class=\"home\">Traefik</li><li class=\"home arrive\">This page</li></ol></div>",
+      "css": ".ds-band { background: #211f1d; color: #f6f3ec; padding: 24px; font-family: 'Public Sans Variable', system-ui, sans-serif; } .ds-chain { display: flex; margin: 0; padding: 0; list-style: none; } .ds-chain li { position: relative; flex: 1 1 0; padding: 0.85rem 0.9rem; border: 1.5px dashed #9c5a3c; border-radius: 0.5rem; font-weight: 650; line-height: 1.25; text-align: center; } .ds-chain li + li { margin-left: 2rem; } .ds-chain li + li::before { content: ''; position: absolute; top: 50%; right: 100%; width: 2rem; height: 2px; margin-right: 1.5px; background: repeating-linear-gradient(90deg, #e8693a 0 6px, transparent 6px 12px); background-size: 12px 2px; animation: ds-flow 1600ms linear infinite; } .ds-chain li.home { border-style: solid; border-color: #e8693a; background: #3a3530; } .ds-chain li.arrive { background: #e8693a; border-color: #e8693a; color: #1c1917; } @keyframes ds-flow { to { background-position: 12px 0; } } @media (prefers-reduced-motion: reduce) { .ds-chain li + li::before { animation: none; } }"
+    },
+    {
+      "name": "Record Sleeve",
+      "kind": "custom",
+      "refersTo": "record-sleeve",
+      "description": "A sleeve with a CSS vinyl disc that slides out on hover.",
+      "html": "<div class=\"ds-paper\"><a class=\"ds-record\" href=\"#\"><div class=\"ds-rec\"><div class=\"ds-disc\"></div><div class=\"ds-sleeve\"></div></div><p class=\"ds-cap\"><strong>Ten</strong><span>Pearl Jam</span></p></a></div>",
+      "css": ".ds-paper { background: #f6f3ec; color: #292524; padding: 24px 64px 24px 24px; font-family: 'Public Sans Variable', system-ui, sans-serif; } .ds-record { display: block; width: 12rem; color: inherit; text-decoration: none; } .ds-rec { position: relative; aspect-ratio: 1; --sleeve: #211f1d; } .ds-sleeve { position: absolute; inset: 0; border-radius: 3px; background: var(--sleeve); outline: 1px solid rgb(255 255 255 / 0.1); outline-offset: -1px; box-shadow: 0 1px 2px rgb(20 14 8 / 0.3), 0 12px 24px -12px rgb(20 14 8 / 0.55); } .ds-disc { position: absolute; inset: 3%; border-radius: 50%; background: radial-gradient(circle, #1c1917 0 2.5%, #e8693a 3% 17%, transparent 17.5%), repeating-radial-gradient(circle, #33302d 0 2px, #1a1817 2px 4px); outline: 1px solid rgb(255 255 255 / 0.3); translate: 11% 0; transition: translate 500ms cubic-bezier(0.16,1,0.3,1); } .ds-record:hover .ds-disc, .ds-record:focus-visible .ds-disc { translate: 19% 0; } .ds-cap { display: grid; gap: 0.1rem; margin: 0.9rem 0 0; } .ds-cap strong { font-size: 1.125rem; line-height: 1.3; } .ds-cap span { color: #57534e; } .ds-record:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Signal Sheet",
+    "overview": "The site reads like a well-kept engineering record printed on warm paper and bound between charcoal covers. Charcoal bands open the page (hero), carry the infrastructure story (the cluster), and close it (contact). In between, warm paper holds the record itself: the work, the research, education and skills, each a dated entry separated by plain rules. Then one ember orange signal marks what is live or actionable: the main action, the moment you hover or focus, the last hop of the request that served this page.\n\nThe tone is calm and confident. Nothing is decorated for its own sake. Type does the work: one variable sans set very heavy and tight at display sizes, and relaxed and readable at body sizes. Imagery is real: product screenshots, a portrait, photos of the actual gear and records. Placeholders admit they are placeholders.\n\nDensity is moderate. The page is long and single-column on phones. On wide screens it opens into a two-column grid with a sticky left rail for section titles, so a hiring visitor can scan it in about a minute.",
+    "keyCharacteristics": [
+      "Three surfaces only: charcoal band, warm paper, and the ember signal.",
+      "One typeface (Public Sans Variable), with weight and tracking setting the hierarchy.",
+      "Flat surfaces separated by rules. Only physical objects (screenshots, record sleeves) cast shadows.",
+      "Pill-shaped actions, gently rounded objects, square text structure.",
+      "Motion is small and physical: things lift, discs slide, the live path flows."
+    ],
+    "rules": [
+      { "name": "The One Ember Rule", "body": "The signal is the only saturated colour on the page. It marks the main action, interaction states, and live things. It never fills a section, a card or a heading.", "section": "colors" },
+      { "name": "The Quiet Hover Rule", "body": "On the charcoal band, buttons hover to cream (on-band fill, charcoal-band text), not to the signal. Nav links and the Contact pill are the exception: they hover to the signal.", "section": "colors" },
+      { "name": "The Raised Band Rule", "body": "In dark mode the band is lighter than the ground (#2a2724 over #131211), never darker. A band must always read as a separate surface.", "section": "colors" },
+      { "name": "The Weight Ladder Rule", "body": "Hierarchy comes from weight and size, never from colour or uppercase: 800 for titles, 650 to 700 for entries, labels and actions, 400 for reading.", "section": "typography" },
+      { "name": "The Pretty Wrap Rule", "body": "Headings use text-wrap: balance; leads and bullets use text-wrap: pretty. Never ship a one-word last line in a heading.", "section": "typography" },
+      { "name": "The Objects Lift Rule", "body": "Only real objects get shadows. Text blocks, entries, nav, and sections never do. If something new isn't a picture of a thing, it stays flat.", "section": "elevation" },
+      { "name": "The Warm Shadow Rule", "body": "Shadows are tinted toward umber (rgb(20 14 8 / …)), never neutral grey or blue-black.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the ember signal for the main action, interaction states and live things only (The One Ember Rule).",
+      "Do put text on the signal in on-signal umber, never white.",
+      "Do separate sections with the 2px ink rule inside the gutter, and entries with 1px paper-seam rules.",
+      "Do use real screenshots and photos, and the dashed slot when a photo is missing.",
+      "Do set every new heading in Public Sans Variable at 650 to 800 weight with negative tracking, and balance its wrap.",
+      "Do tint shadows warm and give them only to objects (The Objects Lift Rule).",
+      "Do use the shared ease-out curve (cubic-bezier(0.16, 1, 0.3, 1)), and turn off every transition and animation under prefers-reduced-motion.",
+      "Do give every focusable element a visible ring: currentColor on paper, the signal on the band."
+    ],
+    "donts": [
+      "Don't add a second accent colour, gradients, or coloured section backgrounds beyond the charcoal band.",
+      "Don't use cards, boxed entries or shadows for text content.",
+      "Don't add a second typeface. Monospace is only for code and hashes.",
+      "Don't use uppercase labels or letter-spaced eyebrows. Hierarchy comes from weight.",
+      "Don't make the dark-mode band darker than the ground.",
+      "Don't invent metrics, logos or testimonials to fill space. Use a visible placeholder instead."
+    ]
+  }
+}

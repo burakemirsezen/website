@@ -5,7 +5,7 @@ export const person = {
   name: 'Burak Emir Sezen',
   location: 'Zurich, Switzerland',
   summary:
-    'Software engineer. I build web platforms end to end, from frontend to database, and keep them running in production. Currently studying for an MSc in Computer Science at ETH Zurich.',
+    'Software engineer. I build software and keep it running: web platforms used by thousands of students and more than 100 companies, deployment tooling for language models on GPU clusters, and the Kubernetes cluster in my flat that serves this page.',
   // TODO: placeholder. Replace with the dedicated mailbox once it exists.
   email: 'hello@bsezen.com',
   github: 'https://github.com/burakemirsezen',
@@ -96,7 +96,7 @@ export const music: {
   photos: { id: string; title: string; text: string; placeholder?: boolean }[];
   gearTitle: string;
   recordsTitle: string;
-  records: { id: string; title: string; artist: string; placeholder?: boolean }[];
+  records: { id: string; title: string; artist: string; url: string; placeholder?: boolean }[];
 } = {
   lead: 'I am learning the guitar, and most evenings end with a record on the turntable.',
   photos: [
@@ -124,10 +124,10 @@ export const music: {
   gearTitle: 'The setup',
   recordsTitle: 'Favourite records',
   records: [
-    { id: 'record-1', title: 'Koi No Yokan', artist: 'Deftones' },
-    { id: 'record-2', title: 'Ten', artist: 'Pearl Jam' },
-    { id: 'record-3', title: 'Rumours', artist: 'Fleetwood Mac' },
-    { id: 'record-4', title: 'Superunknown', artist: 'Soundgarden' },
+    { id: 'record-1', title: 'Koi No Yokan', artist: 'Deftones', url: 'https://open.spotify.com/album/4PIVdqvL1Rc7T7Vfsr8n8Q' },
+    { id: 'record-2', title: 'Ten', artist: 'Pearl Jam', url: 'https://open.spotify.com/album/5B4PYA7wNN4WdEXdIJu58a' },
+    { id: 'record-3', title: 'Rumours', artist: 'Fleetwood Mac', url: 'https://open.spotify.com/album/1bt6q2SruMsBtcerNVtpZB' },
+    { id: 'record-4', title: 'Superunknown', artist: 'Soundgarden', url: 'https://open.spotify.com/album/4AvI4sIYIYE1fIbLLGN7tb' },
   ],
 };
 
@@ -200,12 +200,8 @@ export const projects: Project[] = [
   {
     name: 'Open-source contributions',
     context: 'Calibre-Web Automated, Seerr, SearXNG',
-    // Taken from my merged pull requests in these repositories.
-    points: [
-      'Calibre-Web Automated: fixed Kobo shelf syncing, settings that were not being saved, and the missing back button in the EPUB reader.',
-      'Seerr: added a DB_POOL_SIZE setting for the PostgreSQL connection pool.',
-      'SearXNG: made the container ignore invalid SEARXNG_PORT values.',
-    ],
+    // Summarises my merged pull requests in these repositories.
+    points: ['Merged bug fixes and a configuration option upstream in three self-hosted applications.'],
     links: [
       { label: 'Calibre-Web Automated', url: 'https://github.com/crocodilestick/Calibre-Web-Automated' },
       { label: 'Seerr', url: 'https://github.com/seerr-team/seerr' },

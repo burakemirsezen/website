@@ -1,20 +1,20 @@
 :root {
-  /* Fixed in both themes: the blue hero and the night-blue cluster section. */
-  --blue: #1b3bd0;
-  --blue-deep: #142ea6;
-  --on-blue: #ffffff;
-  --on-blue-soft: #d5ddff;
-  --night: #0a0f26;
-  --night-line: #2c3877;
-  --on-night: #e9ecfa;
-  --on-night-soft: #aab3d6;
-  --signal: #ffc531;
+  /* The charcoal band: hero, cluster section and footer. */
+  --band: #211f1d;
+  --on-band: #f6f3ec;
+  --on-band-soft: #c2bbaf;
+  --band-line: #4a443e;
+  /* The one accent: main action, links' hover, the live path. */
+  --signal: #e8693a;
+  --on-signal: #1c1917;
 
-  --ground: #f7f7f4;
-  --ink: #14161b;
-  --muted: #535a63;
-  --rule: #d7d9d3;
-  --link: #1b3bd0;
+  /* Warm paper, brown-black text. */
+  --ground: #f6f3ec;
+  --ink: #292524;
+  --muted: #57534e;
+  --rule: #ddd8ce;
+  --link: #b03c0e;
+  --shot-edge: transparent;
 
   --col-when: 13rem;
   --gap: 2.5rem;
@@ -26,11 +26,15 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: #10131a;
-    --ink: #eceef2;
-    --muted: #a3abb8;
-    --rule: #2a303b;
-    --link: #a9bcff;
+    /* The ground drops below the band, so the band reads as a raised surface. */
+    --band: #2a2724;
+    --band-line: #524b44;
+    --ground: #131211;
+    --ink: #f1ede4;
+    --muted: #b0a99d;
+    --rule: #34302c;
+    --link: #f0916a;
+    --shot-edge: #3a3531;
   }
 }
 
@@ -61,7 +65,7 @@ body {
 
 ::selection {
   background: var(--signal);
-  color: #14161b;
+  color: var(--on-signal);
 }
 
 h1,
@@ -104,8 +108,8 @@ summary:focus-visible {
   border-radius: 2px;
 }
 
-/* On the blue and night surfaces a ring in the text colour can vanish (the
-   white email button has blue text on blue), so those use the signal yellow. */
+/* On the charcoal band a ring in the text colour can blend into a filled
+   button, so those use the accent. */
 .top a:focus-visible,
 .hero a:focus-visible,
 .foot a:focus-visible,
@@ -136,7 +140,7 @@ summary:focus-visible {
   z-index: 10;
   padding: 0.5rem 0.75rem;
   background: var(--signal);
-  color: #14161b;
+  color: var(--on-signal);
 }
 
 .skip:focus {
@@ -173,19 +177,19 @@ summary:focus-visible {
 /* Hero */
 
 .hero {
-  background: var(--blue);
-  color: var(--on-blue);
+  background: var(--band);
+  color: var(--on-band);
   /* Extra room at the bottom: the screenshot overlaps it. */
   padding-block: clamp(2rem, 5vw, 3.5rem) clamp(9rem, 20vw, 15rem);
 }
 
 /* Section links and a contact link, pinned to the top of the window. On the
-   hero it is the same blue, so it only reads as a bar once you scroll. */
+   hero it is the same charcoal, so it only reads as a bar once you scroll. */
 .top {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--blue);
+  background: var(--band);
 }
 
 .top-in {
@@ -214,7 +218,7 @@ summary:focus-visible {
 .top a {
   display: inline-block;
   padding: 0.7rem 0.15rem;
-  color: var(--on-blue);
+  color: var(--on-band);
   font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
@@ -228,7 +232,7 @@ summary:focus-visible {
 .top .top-contact {
   flex: none;
   padding: 0.7rem 0.95rem;
-  border: 1.5px solid var(--on-blue);
+  border: 1.5px solid var(--on-band);
   border-radius: 999px;
   font-weight: 650;
   line-height: 1.2;
@@ -240,7 +244,7 @@ summary:focus-visible {
 .top .top-contact:hover {
   border-color: var(--signal);
   background: var(--signal);
-  color: #14161b;
+  color: var(--on-signal);
   text-decoration: none;
 }
 
@@ -264,7 +268,7 @@ h1 {
   max-width: 36rem;
   font-size: clamp(1.15rem, 2.1vw, 1.35rem);
   line-height: 1.45;
-  color: var(--on-blue-soft);
+  color: var(--on-band-soft);
   text-wrap: pretty;
 }
 
@@ -278,9 +282,9 @@ h1 {
 .btn {
   display: inline-block;
   padding: 0.7rem 1.15rem;
-  border: 1.5px solid var(--on-blue);
+  border: 1.5px solid var(--on-band);
   border-radius: 999px;
-  color: var(--on-blue);
+  color: var(--on-band);
   font-weight: 650;
   line-height: 1.2;
   text-decoration: none;
@@ -290,15 +294,17 @@ h1 {
     transform 200ms var(--ease);
 }
 
+/* The one filled button: the accent marks the main action. */
 .btn.solid {
-  background: var(--on-blue);
-  color: var(--blue);
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
 }
 
 .btn:hover {
-  background: var(--signal);
-  border-color: var(--signal);
-  color: #14161b;
+  background: var(--on-band);
+  border-color: var(--on-band);
+  color: var(--band);
   transform: translateY(-2px);
 }
 
@@ -323,21 +329,21 @@ h1 {
 
 .portrait-fig figcaption {
   margin-top: 0.5rem;
-  color: var(--on-blue-soft);
+  color: var(--on-band-soft);
   font-size: 0.875rem;
 }
 
 .portrait.slot {
-  border-color: var(--on-blue-soft);
+  border-color: var(--on-band-soft);
   background: repeating-linear-gradient(135deg, transparent 0 14px, rgb(255 255 255 / 0.16) 14px 15px);
-  color: var(--on-blue);
+  color: var(--on-band);
 }
 
 .now h2 {
   font-size: 1rem;
   font-weight: 700;
   padding-bottom: 0.75rem;
-  border-bottom: 2px solid var(--on-blue);
+  border-bottom: 2px solid var(--on-band);
 }
 
 .now li {
@@ -353,7 +359,7 @@ h1 {
 
 .now-where,
 .now-place {
-  color: var(--on-blue-soft);
+  color: var(--on-band-soft);
   font-size: 0.9375rem;
 }
 
@@ -392,9 +398,10 @@ h1 {
   overflow: hidden;
   background: #1f1f1f;
   box-shadow:
-    0 1px 2px rgb(8 12 40 / 0.25),
-    0 18px 40px -12px rgb(8 12 40 / 0.45),
-    0 40px 80px -30px rgb(8 12 40 / 0.5);
+    0 0 0 1px var(--shot-edge),
+    0 1px 2px rgb(20 14 8 / 0.25),
+    0 18px 40px -12px rgb(20 14 8 / 0.45),
+    0 40px 80px -30px rgb(20 14 8 / 0.5);
   transition: transform 500ms var(--ease);
 }
 
@@ -402,13 +409,13 @@ h1 {
   transform: translateY(-6px);
 }
 
-/* Yellow ring with a dark band inside it, so it shows on the light ground,
-   the dark ground and the blue hero alike. */
+/* Accent ring with a dark band inside it, so it shows on the light ground,
+   the dark ground and the charcoal hero alike. */
 .shot:focus-visible {
   outline: 3px solid var(--signal);
   outline-offset: 4px;
   border-radius: 0.75rem;
-  box-shadow: 0 0 0 4px #14161b;
+  box-shadow: 0 0 0 4px var(--on-signal);
 }
 
 .showcase h2,
@@ -442,7 +449,8 @@ h1 {
   font-weight: 650;
 }
 
-.go::after {
+.go::after,
+.listen::after {
   content: '';
   display: inline-block;
   width: 0.55em;
@@ -454,7 +462,8 @@ h1 {
   transition: translate 200ms var(--ease);
 }
 
-.go:hover::after {
+.go:hover::after,
+.record-link:hover .listen::after {
   translate: 0.2em 0;
 }
 
@@ -519,6 +528,11 @@ h1 {
   border-top: 2px solid var(--ink);
 }
 
+/* The cluster band ends the section above, so the next one needs no rule. */
+.cluster + .plain .wrap::before {
+  display: none;
+}
+
 /* Music */
 
 .music {
@@ -538,37 +552,43 @@ h1 {
   max-width: 40rem;
 }
 
-.music-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  gap: clamp(2.5rem, 7vw, 6rem);
-  margin-top: clamp(2rem, 5vw, 3rem);
-}
-
 .sub {
+  margin-top: clamp(2.5rem, 6vw, 4rem);
   padding-bottom: 0.75rem;
   border-bottom: 2px solid var(--ink);
   font-size: 1rem;
   font-weight: 700;
 }
 
+/* Records and gear share one four-column grid, two columns on small screens. */
+.records,
+.gear {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2.25rem clamp(1.25rem, 3vw, 2.25rem);
+  margin-top: 1.75rem;
+}
+
 .gear li {
-  display: flex;
-  gap: 1.25rem;
-  align-items: center;
-  padding-block: 1rem;
-  border-bottom: 1px solid var(--rule);
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
 }
 
 /* Product cut-outs on a faint tile, so dark gear stays visible on the dark theme. */
 .gear img {
-  flex: none;
-  width: 6.5rem;
-  height: 6.5rem;
-  padding: 0.5rem;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 11%;
   border-radius: 0.5rem;
   background: color-mix(in srgb, var(--ink) 7%, transparent);
   object-fit: contain;
+}
+
+.gear strong,
+.record-cap strong {
+  font-size: 1.125rem;
+  line-height: 1.3;
 }
 
 .gear div,
@@ -584,16 +604,14 @@ h1 {
 
 /* Records: a sleeve with the disc showing at its right edge. Until there is
    a cover photo, the sleeve carries the title and artist in type. */
-.records {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.75rem clamp(1rem, 3vw, 2rem);
-  margin-top: 1.5rem;
+.record-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
 }
 
 .record {
   position: relative;
-  width: 76%;
   aspect-ratio: 1;
 }
 
@@ -604,13 +622,13 @@ h1 {
   align-items: flex-end;
   overflow: hidden;
   border-radius: 3px;
-  background: var(--sleeve, #262a35);
+  background: var(--sleeve, #2e2a27);
   outline: 1px solid rgb(255 255 255 / 0.1);
   outline-offset: -1px;
-  color: var(--sleeve-ink, #f7f7f4);
+  color: var(--sleeve-ink, #f6f3ec);
   box-shadow:
-    0 1px 2px rgb(8 12 40 / 0.3),
-    0 12px 24px -12px rgb(8 12 40 / 0.55);
+    0 1px 2px rgb(20 14 8 / 0.3),
+    0 12px 24px -12px rgb(20 14 8 / 0.55);
 }
 
 .sleeve img {
@@ -643,34 +661,47 @@ h1 {
   inset: 3%;
   border-radius: 50%;
   background:
-    radial-gradient(circle, #14161b 0 2.5%, var(--sleeve, #8a93a6) 3% 17%, transparent 17.5%),
-    repeating-radial-gradient(circle, #2e313a 0 2px, #17191e 2px 4px);
+    radial-gradient(circle, var(--on-signal) 0 2.5%, var(--sleeve, #8f887d) 3% 17%, transparent 17.5%),
+    repeating-radial-gradient(circle, #33302d 0 2px, #1a1817 2px 4px);
   outline: 1px solid rgb(255 255 255 / 0.3);
-  translate: 24% 0;
+  translate: 11% 0;
   transition: translate 500ms var(--ease);
 }
 
-.record:hover .disc {
-  translate: 34% 0;
+.record-link:hover .disc,
+.record-link:focus-visible .disc {
+  translate: 19% 0;
 }
 
 .records li:nth-child(4n + 2) {
-  --sleeve: var(--blue);
-  --sleeve-ink: #ffffff;
+  --sleeve: var(--band);
+  --sleeve-ink: #f6f3ec;
 }
 
 .records li:nth-child(4n + 3) {
   --sleeve: var(--signal);
-  --sleeve-ink: #14161b;
+  --sleeve-ink: var(--on-signal);
 }
 
 .records li:nth-child(4n + 4) {
-  --sleeve: #dfe3f5;
-  --sleeve-ink: #0a0f26;
+  --sleeve: #e7e1d5;
+  --sleeve-ink: #1c1917;
 }
 
 .record-cap {
-  margin-top: 0.65rem;
+  margin-top: 0.9rem;
+}
+
+.record-cap .listen {
+  margin-top: 0.35rem;
+  color: var(--link);
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+.record-link:hover .listen {
+  text-decoration: underline 2px;
+  text-underline-offset: 0.2em;
 }
 
 /* An empty photo or cover slot. */
@@ -792,15 +823,15 @@ h1 {
 /* Cluster */
 
 .cluster {
-  background: var(--night);
-  color: var(--on-night);
+  background: var(--band);
+  color: var(--on-band);
   padding-block: clamp(3.5rem, 9vw, 6.5rem);
 }
 
 .cluster .lead {
   margin-top: 1.25rem;
   max-width: 44rem;
-  color: var(--on-night-soft);
+  color: var(--on-band-soft);
 }
 
 .paths {
@@ -812,7 +843,7 @@ h1 {
 .path h3 {
   font-size: 1rem;
   font-weight: 650;
-  color: var(--on-night-soft);
+  color: var(--on-band-soft);
 }
 
 .chain {
@@ -825,7 +856,7 @@ h1 {
   flex: 1 1 0;
   min-width: 0;
   padding: 0.85rem 0.9rem;
-  border: 1.5px dashed #5f6cb4;
+  border: 1.5px dashed #8a8177;
   border-radius: 0.5rem;
   font-weight: 650;
   line-height: 1.25;
@@ -845,28 +876,28 @@ h1 {
   width: clamp(1.25rem, 4vw, 3rem);
   height: 2px;
   margin-right: 1.5px;
-  background: var(--night-line);
+  background: var(--band-line);
 }
 
 .chain li.home {
   border-style: solid;
-  border-color: #7483d8;
-  background: #161f52;
+  border-color: #c2bbaf;
+  background: #3a3530;
 }
 
 .chain.live li {
-  border-color: #8f7a2c;
+  border-color: #9c5a3c;
 }
 
 .chain.live li.home {
-  border-color: #c79f33;
+  border-color: #e8693a;
 }
 
 .legend {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem 1.75rem;
-  color: var(--on-night-soft);
+  color: var(--on-band-soft);
   font-size: 0.9375rem;
 }
 
@@ -879,20 +910,20 @@ h1 {
 .key {
   width: 0.9rem;
   height: 0.9rem;
-  border: 1.5px dashed #5f6cb4;
+  border: 1.5px dashed #8a8177;
   border-radius: 0.2rem;
 }
 
 .key.home {
   border-style: solid;
-  border-color: #7483d8;
-  background: #161f52;
+  border-color: #c2bbaf;
+  background: #3a3530;
 }
 
 .chain.live li:last-child {
   background: var(--signal);
   border-color: var(--signal);
-  color: #14161b;
+  color: var(--on-signal);
 }
 
 .chain.live li + li::before {
@@ -913,7 +944,7 @@ h1 {
   grid-template-columns: 6.5rem minmax(0, 1fr);
   column-gap: 1.25rem;
   padding-block: 0.9rem;
-  border-top: 1px solid var(--night-line);
+  border-top: 1px solid var(--band-line);
 }
 
 .facts dt {
@@ -921,7 +952,7 @@ h1 {
 }
 
 .facts dd {
-  color: var(--on-night-soft);
+  color: var(--on-band-soft);
   text-wrap: pretty;
 }
 
@@ -932,7 +963,7 @@ h1 {
 .more summary {
   width: fit-content;
   padding-block: 0.65rem;
-  color: var(--on-night);
+  color: var(--on-band);
   font-weight: 650;
   cursor: pointer;
 }
@@ -952,8 +983,8 @@ h1 {
 /* Footer */
 
 .foot {
-  background: var(--blue);
-  color: var(--on-blue);
+  background: var(--band);
+  color: var(--on-band);
   padding-block: clamp(3rem, 7vw, 5rem);
 }
 
@@ -972,6 +1003,13 @@ h1 {
 
 .foot-cta a {
   overflow-wrap: anywhere;
+  text-decoration-color: var(--signal);
+  text-decoration-thickness: 3px;
+}
+
+.foot-cta a:hover {
+  color: var(--signal);
+  text-decoration-thickness: 3px;
 }
 
 .foot-links {
@@ -988,14 +1026,14 @@ h1 {
 
 .foot-build {
   margin-top: 2.5rem;
-  color: var(--on-blue-soft);
+  color: var(--on-band-soft);
   font-size: 0.875rem;
 }
 
 .foot-build code {
   font-family: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.95em;
-  color: var(--on-blue);
+  color: var(--on-band);
 }
 
 @keyframes rise {
@@ -1030,8 +1068,9 @@ h1 {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .music-grid {
-    grid-template-columns: minmax(0, 1fr);
+  .records,
+  .gear {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1115,7 +1154,8 @@ h1 {
   .top .top-contact,
   .shot,
   .disc,
-  .go::after {
+  .go::after,
+  .listen::after {
     transition: none;
   }
 }
