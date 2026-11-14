@@ -63,23 +63,6 @@ const coreFacts = ['Compute', 'Deploys', 'Workloads', 'Secrets'];
 // Photos, keyed by id: `portrait` for the hero, and the ids in `music`
 // (src/data/site.ts) for the music section. Missing ones show a dashed slot.
 // Example: import guitar from "../assets/guitar.jpg"; then add `guitar` here.
-// Audio for the turntable: put `record-1.mp3` .. `record-4.mp3` in src/assets
-// (or set `audio` on the record in src/data/site.ts).
-const audioById = Object.fromEntries(
-  Object.entries(import.meta.glob<string>('../assets/*.mp3', { eager: true, query: '?url', import: 'default' })).map(
-    ([path, url]) => [path.replace(/^.*\/|\.mp3$/g, ''), url],
-  ),
-);
-// Labels for the WebGL room's hover notes, from the same data as the lists.
-const roomRecords = JSON.stringify(
-  music.records.map(({ id, title, artist, tracks, audio, url }) => ({
-    title,
-    artist,
-    tracks: tracks ?? (audio ?? audioById[id] ? [{ title, url: (audio ?? audioById[id])!, duration: 240 }] : undefined),
-    url,
-  })),
-);
-const roomGear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, text }) => [id, { title, text }])));
 
 // Structured data for search engines (schema.org ProfilePage with a Person),
 // built from the same data as the page. `<` is escaped so the JSON cannot
@@ -479,6 +462,7 @@ const photos: Record<string, ImageMetadata | undefined> = {
       <section id="outside" class="music" aria-labelledby="outside-h">
         <div class="wrap">
           <h2 id="outside-h">Music</h2>
+          <p class="lead">{music.lead}</p>
 
           <!-- Desktop only: the listening corner as a 3D room (WebGL, loaded
                when the section comes near). It repeats what the lists below
@@ -487,7 +471,7 @@ const photos: Record<string, ImageMetadata | undefined> = {
                and the lists are only visually hidden (they show again when a
                keyboard user tabs into them). If it cannot load, the stage and
                its hint go and the lists show as on phones. -->
-          <div class="room-stage" aria-hidden="true" data-records={roomRecords} data-gear={roomGear}>
+          <div class="room-stage" aria-hidden="true">
             <div class="room-loader"></div>
           </div>
           <p class="room-hint">Hover over things for details. Click a record to put it on.</p>
@@ -666,8 +650,6 @@ const photos: Record<string, ImageMetadata | undefined> = {
             const room = mountRoom(stage, {
               covers,
               reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
-              records: JSON.parse(stage.dataset.records ?? '[]'),
-              gear: JSON.parse(stage.dataset.gear ?? '{}'),
               onReady: reveal,
             });
             dispose = room.dispose;

@@ -125,8 +125,7 @@ export const music: {
     placeholder?: boolean;
   }[];
 } = {
-  // No lead under the heading: the room and its caption speak for themselves.
-  lead: '',
+  lead: 'Outside work I play the guitar and listen to records. Everything here is my own gear, modelled after the listening corner in my\u00a0flat.',
   photos: [
     {
       id: 'guitar',
@@ -155,7 +154,7 @@ export const music: {
       roomOnly: true,
     },
   ],
-  gearTitle: 'The setup',
+  gearTitle: 'My setup',
   recordsTitle: 'Favourite records',
   records: [
     {

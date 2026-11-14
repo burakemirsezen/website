@@ -18,6 +18,7 @@ import { buildInterface } from './interface';
 import { buildTurntable } from './turntable';
 import { buildSpeaker } from './speakers';
 import { applyBake } from './lightbake';
+import { music } from '../../data/site';
 
 export interface RoomTrack {
   title: string;
@@ -1733,8 +1734,8 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
 
   // ------------------------------------------------------------ Hover
 
-  const recordInfo = options.records ?? [];
-  const gear = options.gear ?? {};
+  const recordInfo = options.records ?? music.records;
+  const gear = options.gear ?? Object.fromEntries(music.photos.map(({ id, title, text }) => [id, { title, text }]));
   const hoverables: Hoverable[] = [
     ...records.map((root, i) => ({
       root,
