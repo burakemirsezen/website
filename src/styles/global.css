@@ -16,7 +16,22 @@
   --link: #b03c0e;
   --shot-edge: transparent;
 
-  --col-when: 13rem;
+  /* Spacing scale. Every gap between blocks takes one of these steps; the
+     larger ones grow with the window. Smaller values left in components are
+     optical nudges or tap-target padding, not rhythm. */
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-s: 1rem;
+  --space-m: 1.5rem;
+  --space-l: clamp(1.75rem, 1.5rem + 1vw, 2.25rem);
+  --space-xl: clamp(2rem, 1.5rem + 2.5vw, 3rem);
+  --space-2xl: clamp(2.5rem, 1.75rem + 3.75vw, 4rem);
+  /* Two section rhythms: list sections, and the feature sections and bands. */
+  --section: clamp(2.5rem, 2rem + 2.5vw, 3.5rem);
+  --section-lg: clamp(3.5rem, 2.5rem + 5vw, 6rem);
+
+  --rail: 13rem;
   --gap: 2.5rem;
   --pad: clamp(1.25rem, 5vw, 3rem);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -59,8 +74,32 @@ body {
   color: var(--ink);
   font-family: 'Public Sans Variable', system-ui, sans-serif;
   font-size: 1.0625rem;
-  line-height: 1.6;
+  line-height: 1.5;
   font-variant-numeric: lining-nums;
+  /* Taps flash a faint signal tint instead of the browser's grey box. */
+  -webkit-tap-highlight-color: rgb(232 105 58 / 0.18);
+  /* On macOS, light text on the charcoal band otherwise renders too heavy. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Long words and addresses wrap instead of overflowing; paragraphs avoid a
+   stranded last word and headings balance their lines. */
+p,
+h1,
+h2,
+h3 {
+  overflow-wrap: break-word;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
 }
 
 ::selection {
@@ -160,7 +199,7 @@ summary:focus-visible {
 }
 
 .ticks li + li {
-  margin-top: 0.45rem;
+  margin-top: var(--space-2xs);
 }
 
 .ticks li::before {
@@ -177,10 +216,12 @@ summary:focus-visible {
 /* Hero */
 
 .hero {
+  /* Lets the masthead size its type from the hero's own width. */
+  container-type: inline-size;
   background: var(--band);
   color: var(--on-band);
   /* Extra room at the bottom: the screenshot overlaps it. */
-  padding-block: clamp(2rem, 5vw, 3.5rem) clamp(9rem, 20vw, 15rem);
+  padding-block: var(--space-xl) clamp(9rem, 20vw, 15rem);
 }
 
 /* Section links and a contact link, pinned to the top of the window. On the
@@ -196,8 +237,8 @@ summary:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding-block: 0.25rem;
+  gap: var(--space-s);
+  padding-block: var(--space-3xs);
 }
 
 .top ul {
@@ -224,9 +265,13 @@ summary:focus-visible {
   text-decoration: none;
 }
 
-.top a:hover {
-  color: var(--signal);
-  text-decoration: underline 2px;
+/* Hover and the section in view both keep the cream text (the highest
+   contrast on the band) and add a signal underline. Turning the text orange
+   would lower its contrast on hover, the opposite of what hover should do. */
+.top a:hover,
+.top a[aria-current] {
+  text-decoration: underline 2px var(--signal);
+  text-underline-offset: 0.35em;
 }
 
 .top .top-contact {
@@ -248,23 +293,77 @@ summary:focus-visible {
   text-decoration: none;
 }
 
-.hero-grid {
+/* The masthead. Its font size is the content width divided by the measured
+   width of "Burak Emir" in Public Sans 800 (4.88em, plus a little slack), so
+   the first line always runs edge to edge. Everything inside is sized in em,
+   so the portrait strip and the rule scale with the type. */
+.masthead {
+  /* cqi is the hero's width without the scrollbar, unlike vw. */
+  --poster: calc((min(100cqi, 72rem) - 2 * var(--pad)) / 4.97);
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: clamp(2rem, 6vw, 5rem);
+  grid-template-columns: 2.86em minmax(0, 1fr);
+  column-gap: 0.08em;
   align-items: end;
+  font-size: var(--poster);
 }
 
 h1 {
-  font-size: clamp(3rem, 9.5vw, 6rem);
+  grid-column: 1 / -1;
+  grid-row: 1;
+  font-size: 1em;
   font-weight: 800;
-  line-height: 0.94;
-  letter-spacing: -0.04em;
-  animation: rise 600ms var(--ease) both;
+  line-height: 0.86;
+  letter-spacing: -0.045em;
+  animation: rise 700ms var(--ease) both;
+}
+
+h1 span {
+  display: block;
+  white-space: nowrap;
+}
+
+/* The portrait sits in the space after the last word, cap height tall, so
+   it reads as part of the line. */
+.masthead .portrait-fig {
+  grid-column: 2;
+  grid-row: 1;
+  /* Its top lines up with the tops of the capitals (cap height 0.734em);
+     it then hangs 0.266em below the baseline, beside the rule, so the
+     frame is about 2:1 instead of a thin strip. The baseline sits 0.07em
+     above the bottom of the name's box. */
+  height: 1em;
+  margin: 0 0 calc(0.07em - 0.266em);
+}
+
+.masthead .portrait {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.5rem;
+  object-fit: cover;
+  object-position: 50% 32%;
+}
+
+/* The one ember rule under the name. */
+.masthead::after {
+  content: '';
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 1.4em;
+  height: max(6px, 0.04em);
+  margin-top: 0.16em;
+  background: var(--signal);
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: var(--space-2xl);
+  align-items: start;
+  margin-top: var(--space-xl);
 }
 
 .summary {
-  margin-top: 1.75rem;
+  margin-top: 0;
   max-width: 36rem;
   font-size: clamp(1.15rem, 2.1vw, 1.35rem);
   line-height: 1.45;
@@ -275,8 +374,8 @@ h1 {
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 2.25rem;
+  gap: var(--space-xs);
+  margin-top: var(--space-l);
 }
 
 .btn {
@@ -313,24 +412,7 @@ h1 {
 }
 
 .now {
-  padding-bottom: 0.25rem;
-}
-
-.portrait-fig {
-  margin: 0 0 1.75rem;
-}
-
-.portrait {
-  width: 100%;
-  aspect-ratio: 3 / 2;
-  border-radius: 0.5rem;
-  object-fit: cover;
-}
-
-.portrait-fig figcaption {
-  margin-top: 0.5rem;
-  color: var(--on-band-soft);
-  font-size: 0.875rem;
+  padding-bottom: var(--space-3xs);
 }
 
 .portrait.slot {
@@ -339,16 +421,30 @@ h1 {
   color: var(--on-band);
 }
 
-.now h2 {
-  font-size: 1rem;
-  font-weight: 700;
-  padding-bottom: 0.75rem;
+/* "Right now" and when it was last updated, on one line above a rule. */
+.now-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-s);
+  padding-bottom: var(--space-xs);
   border-bottom: 2px solid var(--on-band);
 }
 
+.now h2 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.now-updated {
+  color: var(--on-band-soft);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .now li {
-  padding-block: 0.8rem;
-  border-bottom: 1px solid rgb(255 255 255 / 0.35);
+  padding-block: var(--space-xs);
+  border-bottom: 1px solid color-mix(in srgb, var(--on-band) 30%, transparent);
 }
 
 .now-what {
@@ -364,19 +460,20 @@ h1 {
 }
 
 .now-place {
-  margin-top: 0.8rem;
+  margin-top: var(--space-xs);
 }
+
 
 /* Featured platforms */
 
 .showcase {
-  padding-bottom: clamp(3.5rem, 8vw, 6rem);
+  padding-bottom: var(--section-lg);
 }
 
 .showcase-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
-  gap: clamp(2rem, 5vw, 4rem);
+  gap: var(--space-2xl);
   align-items: start;
 }
 
@@ -389,14 +486,14 @@ h1 {
   position: relative;
   width: 58%;
   margin: -20% -3% 0 auto;
-  border: 1px solid #3a3a3a;
+  border: 1px solid #3a3531;
 }
 
 .shot {
   display: block;
   border-radius: 0.75rem;
   overflow: hidden;
-  background: #1f1f1f;
+  background: #211f1d;
   box-shadow:
     0 0 0 1px var(--shot-edge),
     0 1px 2px rgb(20 14 8 / 0.25),
@@ -428,22 +525,23 @@ h1 {
 }
 
 .showcase-text {
-  padding-top: 2.5rem;
+  padding-top: var(--space-xl);
 }
 
+/* Heading to lead: s. Lead to bullets: m. Bullets to link: s. */
 .showcase-text .lead,
 .visit .lead {
-  margin-top: 1rem;
+  margin-top: var(--space-s);
 }
 
 .showcase .ticks {
-  margin-top: 1.25rem;
+  margin-top: var(--space-m);
   color: var(--muted);
 }
 
 .go {
   display: inline-block;
-  margin-top: 1rem;
+  margin-top: var(--space-s);
   /* Padding makes the link a comfortable tap target. */
   padding-block: 0.5rem;
   font-weight: 650;
@@ -470,10 +568,10 @@ h1 {
 .visit {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-  gap: clamp(2rem, 5vw, 4rem);
+  gap: var(--space-2xl);
   align-items: center;
-  margin-top: clamp(3rem, 7vw, 5rem);
-  padding-top: clamp(2rem, 5vw, 3rem);
+  margin-top: var(--section-lg);
+  padding-top: var(--space-xl);
 }
 
 .visit > div {
@@ -489,7 +587,7 @@ h1 {
 /* Plain list sections */
 
 .plain .wrap {
-  padding-block: 3rem 3.5rem;
+  padding-block: var(--section);
 }
 
 /* Wide screens: the section title sits in a left rail and stays in view
@@ -497,7 +595,7 @@ h1 {
 @media (min-width: 60.0625rem) {
   .plain .wrap {
     display: grid;
-    grid-template-columns: var(--col-when) minmax(0, 1fr);
+    grid-template-columns: var(--rail) minmax(0, 1fr);
     column-gap: var(--gap);
     align-items: start;
   }
@@ -536,7 +634,7 @@ h1 {
 /* Music */
 
 .music {
-  padding-block: clamp(3.5rem, 8vw, 6rem);
+  padding-block: var(--section-lg);
 }
 
 .music h2 {
@@ -548,41 +646,150 @@ h1 {
 }
 
 .music .lead {
-  margin-top: 1rem;
+  margin-top: var(--space-s);
   max-width: 40rem;
 }
 
 .sub {
-  margin-top: clamp(2.5rem, 6vw, 4rem);
-  padding-bottom: 0.75rem;
+  margin-top: var(--space-2xl);
+  padding-bottom: var(--space-xs);
   border-bottom: 2px solid var(--ink);
   font-size: 1rem;
   font-weight: 700;
 }
 
-/* Records and gear share one four-column grid, two columns on small screens. */
+/* The listening corner. Records stand on a shelf and the gear stands on a
+   desk; both surfaces are the system's own 2px ink rule, drawn as one
+   segment per item that runs into the gaps so the segments join up. */
+.music .sub {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
 .records,
 .gear {
+  --gap-x: var(--space-l);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 2.25rem clamp(1.25rem, 3vw, 2.25rem);
-  margin-top: 1.75rem;
+  gap: var(--space-xl) var(--gap-x);
+  margin-top: var(--space-l);
+}
+
+/* The shelf: each sleeve leans a little and rests on one bottom corner, as
+   records on a shelf do. Hover or focus stands it up and lifts it. */
+.records li:nth-child(odd) .record {
+  transform-origin: 0 100%;
+  rotate: -2.5deg;
+}
+
+.records li:nth-child(even) .record {
+  transform-origin: 100% 100%;
+  rotate: 1.5deg;
+}
+
+.record {
+  transition:
+    rotate 500ms var(--ease),
+    translate 500ms var(--ease);
+}
+
+.records .record-link:hover .record,
+.records .record-link:focus-visible .record {
+  rotate: 0deg;
+  translate: 0 -0.6rem;
+}
+
+/* The shelf itself is the rule above each caption; the segments run into
+   the gaps and join into one board. */
+.records .record-cap {
+  margin: 0 calc(var(--gap-x) / -2);
+  padding: var(--space-s) calc(var(--gap-x) / 2) 0;
+  border-top: 2px solid var(--ink);
+}
+
+/* The desk: rows are shared across items (subgrid), so every object's
+   base sits on the same line whatever its height. */
+.gear {
+  grid-template-columns: 16fr 10fr 9fr 17fr;
+  grid-auto-flow: row dense;
+  padding-top: var(--space-l);
+  /* A soft pool of light behind the desk, so dark gear stays visible on the
+     dark theme. */
+  background: radial-gradient(
+    60% 75% at 50% 70%,
+    color-mix(in srgb, var(--ink) 9%, transparent),
+    transparent 72%
+  );
 }
 
 .gear li {
   display: grid;
-  gap: 0.9rem;
-  align-content: start;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-s);
 }
 
-/* Product cut-outs on a faint tile, so dark gear stays visible on the dark theme. */
-.gear img {
+.gear [data-gear='turntable'] {
+  order: 1;
+}
+
+.gear [data-gear='interface'] {
+  order: 2;
+}
+
+.gear [data-gear='amp'] {
+  order: 3;
+}
+
+.gear [data-gear='guitar'] {
+  order: 4;
+}
+
+.gear-obj {
+  display: flex;
+  align-items: flex-end;
+  margin-inline: calc(var(--gap-x) / -2);
+  padding-inline: calc(var(--gap-x) / 2);
+  border-bottom: 2px solid var(--ink);
+}
+
+.gear-obj img {
   width: 100%;
-  aspect-ratio: 1;
-  padding: 11%;
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  object-fit: contain;
+  /* Contact shadow: the object sits on the desk. */
+  filter: drop-shadow(0 0.4rem 0.35rem rgb(20 14 8 / 0.28));
+}
+
+/* The outermost segments stop at the content edge instead of running into
+   the page margin. Desk order is turntable, interface, amp, guitar. */
+.records li:first-child .record-cap,
+.gear [data-gear='turntable'] .gear-obj {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.records li:last-child .record-cap,
+.gear [data-gear='guitar'] .gear-obj {
+  margin-right: 0;
+  padding-right: 0;
+}
+
+@media (max-width: 60rem) {
+  .records li:nth-child(odd) .record-cap,
+  .gear [data-gear='amp'] .gear-obj {
+    margin-left: 0;
+    padding-left: 0;
+  }
+
+  .records li:nth-child(even) .record-cap,
+  .gear [data-gear='interface'] .gear-obj {
+    margin-right: 0;
+    padding-right: 0;
+  }
+}
+
+/* The guitar leans against the wall with its body on the desk. */
+.gear [data-gear='guitar'] .gear-obj img {
+  margin-bottom: -2px;
 }
 
 .gear strong,
@@ -602,16 +809,18 @@ h1 {
   color: var(--muted);
 }
 
-/* Records: a sleeve with the disc showing at its right edge. Until there is
-   a cover photo, the sleeve carries the title and artist in type. */
+/* Records: a sleeve with the disc showing at its right edge. */
 .record-link {
   display: block;
   color: inherit;
   text-decoration: none;
 }
 
+/* The sleeve leaves room for the disc, so the disc stays inside its own
+   column and never reaches the page edge on phones. */
 .record {
   position: relative;
+  width: 88%;
   aspect-ratio: 1;
 }
 
@@ -689,11 +898,11 @@ h1 {
 }
 
 .record-cap {
-  margin-top: 0.9rem;
+  margin-top: var(--space-s);
 }
 
 .record-cap .listen {
-  margin-top: 0.35rem;
+  margin-top: var(--space-3xs);
   color: var(--link);
   font-size: 0.9375rem;
   font-weight: 650;
@@ -702,6 +911,209 @@ h1 {
 .record-link:hover .listen {
   text-decoration: underline 2px;
   text-underline-offset: 0.2em;
+}
+
+/* The listening room (desktop): a WebGL scene (src/scripts/room). The stage
+   holds its 16:9 box from the start, as a quiet warm fill, so nothing
+   shifts when the room arrives; a small ember dot breathes in it while the
+   room loads (shown only after 200 ms, see index.astro). If the room cannot
+   load, the stage and its hint go and the lists below show instead. */
+.room-stage {
+  position: relative;
+  display: none;
+  aspect-ratio: 16 / 9;
+  margin-top: var(--space-xl);
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background:
+    radial-gradient(70% 60% at 50% 45%, color-mix(in srgb, var(--ink) 3%, transparent), transparent),
+    color-mix(in srgb, var(--ink) 6%, var(--ground));
+}
+
+@media (min-width: 60.0625rem) {
+  .room-stage {
+    display: block;
+  }
+
+  .music.room-failed .room-stage,
+  .music.room-failed .room-hint {
+    display: none;
+  }
+}
+
+.room-loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--signal);
+  opacity: 0;
+  transition: opacity 200ms var(--ease);
+}
+
+.room-stage.is-loading .room-loader {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .room-stage.is-loading .room-loader {
+    animation: room-breathe 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes room-breathe {
+  50% {
+    scale: 1.6;
+    opacity: 0.45;
+  }
+}
+
+.room-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 300ms var(--ease);
+}
+
+.room-stage.is-ready .room-canvas {
+  opacity: 1;
+}
+
+/* The WebGL room's hover note: what the object is, next to it. Paper with
+   the system's 2px ink rule on top, no card. Placed by scene.ts. */
+.room-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: grid;
+  gap: 0.1rem;
+  max-width: 18rem;
+  padding: 0.5rem 0.75rem 0.55rem;
+  border-top: 2px solid var(--ink);
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  translate: 0 0.25rem;
+  transition:
+    opacity 160ms var(--ease),
+    translate 300ms var(--ease);
+}
+
+.room-tip.is-on {
+  opacity: 1;
+  translate: 0 0;
+}
+
+.room-tip strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.room-tip span {
+  color: var(--muted);
+}
+
+.room-tip .listen {
+  color: var(--link);
+  font-weight: 650;
+}
+
+/* Hotspots: an ember dot on each object that has a note. They go for good
+   once the visitor hovers anything. */
+.room-dots {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 400ms var(--ease);
+}
+
+.room-dots.is-gone {
+  opacity: 0;
+}
+
+.room-dot {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 0 3px rgb(232 105 58 / 0.22), 0 0 10px 2px rgb(232 105 58 / 0.35);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .room-dot::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1px solid rgb(232 105 58 / 0.6);
+    animation: room-dot 2.8s ease-out infinite;
+  }
+}
+
+@keyframes room-dot {
+  from {
+    scale: 1;
+    opacity: 0.8;
+  }
+
+  70%,
+  to {
+    scale: 2.6;
+    opacity: 0;
+  }
+}
+
+/* The hint under the room, only once the WebGL room is up. */
+.room-hint {
+  display: none;
+  margin-top: var(--space-xs);
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+@media (min-width: 60.0625rem) {
+  .room-stage.has-gl + .room-hint {
+    display: block;
+  }
+}
+
+@media (min-width: 60.0625rem) {
+  /* With the WebGL room up, its hover notes say what the lists say, so the
+     lists stay for screen readers only, and show again when a keyboard
+     user tabs into a record link. */
+  .room-stage.has-gl ~ .music-list:not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* The visible desk lists only gear that has a photo; the rest (marked
+   data-room-only) is in the room's hover notes, and stays in the list for
+   screen readers while the room is up. */
+.gear [data-room-only] {
+  display: none;
+}
+
+.room-stage.has-gl ~ .music-list .gear [data-room-only] {
+  display: block;
 }
 
 /* An empty photo or cover slot. */
@@ -737,43 +1149,31 @@ h1 {
 
 .entries,
 .skills {
-  margin-top: 1.75rem;
+  margin-top: var(--space-l);
 }
 
 .entry,
 .skills > div {
   display: grid;
-  column-gap: var(--gap);
   border-top: 1px solid var(--rule);
 }
 
-/* Title and detail on the left, dates on the right. */
+/* The date sits above the title as a small line, so the text below gets the
+   full width of the column. */
 .entry {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 13rem);
-}
-
-.entry .what {
-  grid-area: 1 / 1;
+  row-gap: var(--space-3xs);
+  padding-block: var(--space-m);
 }
 
 .entry .when {
-  grid-area: 1 / 2;
-  padding-top: 0.2rem;
-  text-align: right;
+  font-size: 0.9375rem;
   font-variant-numeric: tabular-nums;
-  text-wrap: balance;
 }
 
 .skills > div {
-  grid-template-columns: 12rem minmax(0, 1fr);
-}
-
-.entry {
-  padding-block: 1.5rem;
-}
-
-.skills > div {
-  padding-block: 0.6rem;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  column-gap: var(--space-m);
+  padding-block: var(--space-xs);
 }
 
 .entry:first-child,
@@ -786,9 +1186,10 @@ h1 {
   padding-bottom: 0;
 }
 
+/* Dates and skill groups recede. The organisation stays in ink: a scan of the
+   titles alone reads "Software Engineer" twice, and the org tells them apart. */
 .when,
-.skills dt,
-.org {
+.skills dt {
   color: var(--muted);
 }
 
@@ -805,19 +1206,25 @@ h1 {
 }
 
 .what .ticks {
-  margin-top: 0.85rem;
+  margin-top: var(--space-xs);
   max-width: 42rem;
 }
 
 .links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 1.5rem;
-  margin-top: 0.9rem;
+  gap: var(--space-3xs) var(--space-m);
+  margin-top: var(--space-xs);
 }
 
 .links .go {
   margin-top: 0;
+}
+
+/* Under a platform's bullets: the live site and its source, one step down. */
+.showcase-text .links,
+.visit .links {
+  margin-top: var(--space-s);
 }
 
 /* Cluster */
@@ -825,19 +1232,29 @@ h1 {
 .cluster {
   background: var(--band);
   color: var(--on-band);
-  padding-block: clamp(3.5rem, 9vw, 6.5rem);
+  padding-block: var(--section-lg);
 }
 
 .cluster .lead {
-  margin-top: 1.25rem;
+  margin-top: var(--space-s);
   max-width: 44rem;
   color: var(--on-band-soft);
 }
 
 .paths {
+  position: relative;
   display: grid;
-  gap: 2.25rem;
-  margin-top: clamp(2.5rem, 6vw, 4rem);
+  gap: var(--space-xl);
+  margin-top: var(--space-2xl);
+}
+
+/* The key sits on the first path's heading line, at the right. */
+@media (min-width: 44.0625rem) {
+  .paths > .legend {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
 }
 
 .path h3 {
@@ -848,7 +1265,7 @@ h1 {
 
 .chain {
   display: flex;
-  margin-top: 0.9rem;
+  margin-top: var(--space-xs);
 }
 
 .chain li {
@@ -896,22 +1313,23 @@ h1 {
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 1.75rem;
+  gap: var(--space-2xs) var(--space-m);
   color: var(--on-band-soft);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
 }
 
 .legend span {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
 }
 
+/* Each key is a miniature node, the same shape as the steps it explains. */
 .key {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 1.5rem;
+  height: 0.85rem;
   border: 1.5px dashed #8a8177;
-  border-radius: 0.2rem;
+  border-radius: 0.3rem;
 }
 
 .key.home {
@@ -932,18 +1350,49 @@ h1 {
   animation: flow 1600ms linear infinite;
 }
 
+/* The script dims the live path, then lights it hop by hop the first time
+   it scrolls into view. Without the script it simply shows lit. */
+.chain.live.dim li {
+  opacity: 0.25;
+}
+
+.chain.live.lit li {
+  animation: hop-in 500ms var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 170ms);
+}
+
+@keyframes hop-in {
+  from {
+    opacity: 0.25;
+  }
+}
+
+/* Live facts under each path: this visit's timing, this build's age. */
+.chain-meta {
+  margin-top: var(--space-xs);
+  color: var(--on-band-soft);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chain-meta code {
+  color: var(--on-band);
+  font-family: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
 .facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: clamp(2rem, 6vw, 5rem);
-  margin-top: clamp(2.5rem, 6vw, 4rem);
+  column-gap: var(--space-2xl);
+  margin-top: var(--space-2xl);
 }
 
 .facts > div {
   display: grid;
   grid-template-columns: 6.5rem minmax(0, 1fr);
-  column-gap: 1.25rem;
-  padding-block: 0.9rem;
+  column-gap: var(--space-s);
+  padding-block: var(--space-xs);
   border-top: 1px solid var(--band-line);
 }
 
@@ -957,23 +1406,67 @@ h1 {
 }
 
 .more {
-  margin-top: 0.75rem;
+  margin-top: var(--space-xs);
 }
 
+/* The browser's triangle is replaced by the same drawn chevron as the go
+   links: pointing down when closed, up when open. */
 .more summary {
   width: fit-content;
   padding-block: 0.65rem;
   color: var(--on-band);
   font-weight: 650;
+  list-style: none;
   cursor: pointer;
 }
 
+.more summary::-webkit-details-marker {
+  display: none;
+}
+
+.more summary::after {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-left: 0.6em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-0.2em) rotate(45deg);
+  transition: transform 300ms var(--ease);
+}
+
+.more[open] summary::after {
+  transform: translateY(0.05em) rotate(-135deg);
+}
+
 .more summary:hover {
-  color: var(--signal);
+  text-decoration: underline 2px var(--signal);
+  text-underline-offset: 0.35em;
+}
+
+/* Where the browser can animate to `auto`, the facts slide open instead of
+   appearing at once. Elsewhere they simply appear. */
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+
+  .more::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size 400ms var(--ease),
+      content-visibility 400ms allow-discrete;
+  }
+
+  .more[open]::details-content {
+    block-size: auto;
+  }
 }
 
 .more .facts {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2xs);
 }
 
 .cluster ::selection {
@@ -983,9 +1476,11 @@ h1 {
 /* Footer */
 
 .foot {
+  /* Lets the address size itself from the footer's own width. */
+  container-type: inline-size;
   background: var(--band);
   color: var(--on-band);
-  padding-block: clamp(3rem, 7vw, 5rem);
+  padding-block: var(--section-lg);
 }
 
 .foot a {
@@ -994,28 +1489,39 @@ h1 {
 
 .foot-cta {
   max-width: 34rem;
-  font-size: clamp(1.5rem, 3.6vw, 2.25rem);
-  font-weight: 750;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  color: var(--on-band-soft);
+  font-size: clamp(1.15rem, 2vw, 1.4rem);
+  line-height: 1.4;
   text-wrap: balance;
 }
 
-.foot-cta a {
-  overflow-wrap: anywhere;
-  text-decoration-color: var(--signal);
-  text-decoration-thickness: 3px;
+/* The address, poster-sized: about 0.54em per character in Public Sans 800,
+   so the content width divided by (characters × 0.56) fits with a little
+   slack. Capped so a short address does not get absurd. */
+.foot-mail {
+  margin-top: var(--space-xs);
+  font-size: min(9rem, calc((min(100cqi, 72rem) - 2 * var(--pad)) / (var(--chars, 16) * 0.56)));
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
 }
 
-.foot-cta a:hover {
-  color: var(--signal);
-  text-decoration-thickness: 3px;
+.foot-mail a {
+  text-decoration-color: var(--signal);
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.12em;
+}
+
+/* Hover turns the line orange-on-cream solid: the underline thickens. */
+.foot-mail a:hover {
+  text-decoration-thickness: 0.12em;
 }
 
 .foot-links {
   display: flex;
-  gap: 2rem;
-  margin-top: 1.25rem;
+  gap: var(--space-xl);
+  margin-top: var(--space-s);
   font-weight: 600;
 }
 
@@ -1025,7 +1531,7 @@ h1 {
 }
 
 .foot-build {
-  margin-top: 2.5rem;
+  margin-top: var(--space-xl);
   color: var(--on-band-soft);
   font-size: 0.875rem;
 }
@@ -1064,6 +1570,11 @@ h1 {
     padding-top: 0;
   }
 
+  /* Stacked, both platforms show the screenshot first, then the text. */
+  .visit-shot {
+    order: -1;
+  }
+
   .facts {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1079,26 +1590,27 @@ h1 {
     display: none;
   }
 
+  /* Phones: the name keeps the full width; the portrait drops below the
+     rule as a wide strip. */
+  .masthead {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .masthead .portrait-fig {
+    grid-column: 1;
+    grid-row: 3;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    margin: var(--space-l) 0 0;
+  }
+
   .top ul {
     column-gap: 0.9rem;
   }
 
-  .entry,
   .skills > div {
     grid-template-columns: minmax(0, 1fr);
-    row-gap: 0.35rem;
-  }
-
-  /* Dates go back above the title. */
-  .entry .what,
-  .entry .when {
-    grid-area: auto;
-  }
-
-  .entry .when {
-    padding-top: 0;
-    font-size: 0.9375rem;
-    text-align: left;
+    row-gap: var(--space-3xs);
   }
 
   /* Steps stack, connectors turn vertical. */
@@ -1146,13 +1658,19 @@ h1 {
   }
 
   h1,
-  .chain.live li + li::before {
+  .chain.live li + li::before,
+  .chain.live.lit li {
     animation: none;
   }
 
   .btn,
   .top .top-contact,
   .shot,
+  .room-tip,
+  .room-dots,
+  .room-canvas,
+  .room-loader,
+  .record,
   .disc,
   .go::after,
   .listen::after {
@@ -1160,12 +1678,50 @@ h1 {
   }
 }
 
+/* Print and "Save as PDF": one light, ink-on-paper page, whatever the screen
+   theme. Bands lose their fill, so their light text tokens switch to ink;
+   links print their address; nothing splits across a page break. */
+@page {
+  margin: 16mm 14mm;
+}
+
 @media print {
+  :root {
+    --ground: #ffffff;
+    --ink: #1c1917;
+    --muted: #57534e;
+    --rule: #d6d1c7;
+    --link: #1c1917;
+    --shot-edge: #d6d1c7;
+  }
+
   .hero,
   .foot,
   .cluster {
+    --on-band: var(--ink);
+    --on-band-soft: var(--muted);
+    --band-line: var(--rule);
     background: none;
-    color: #000;
+    color: var(--ink);
+  }
+
+  .hero {
+    padding-block: 0 var(--space-xl);
+  }
+
+  .skip,
+  .top,
+  .shot-2,
+  .listen,
+  .chain-meta,
+  .room-stage {
+    display: none;
+  }
+
+  .chain.live.dim li,
+  .chain.live.lit li {
+    opacity: 1;
+    animation: none;
   }
 
   .shots {
@@ -1176,8 +1732,99 @@ h1 {
     box-shadow: none;
   }
 
-  .skip,
-  .top {
+  .plain .wrap > h2 {
+    position: static;
+  }
+
+  /* Buttons print as plain text followed by where they lead. */
+  .btn,
+  .btn.solid {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+  }
+
+  .actions a[href^='http']::after,
+  .foot-links a::after {
+    content: ' ' attr(href);
+    font-weight: 400;
+  }
+
+  .go::after {
     display: none;
+  }
+
+  .links .go::after {
+    content: ' (' attr(href) ')';
+    display: inline;
+    width: auto;
+    height: auto;
+    margin: 0;
+    border: 0;
+    transform: none;
+    font-weight: 400;
+  }
+
+  /* A link whose label already is its address needs no repeat. */
+  .links .go.url::after {
+    display: none;
+  }
+
+  .chain li.home,
+  .key.home {
+    background: none;
+  }
+
+  .chain.live li:last-child {
+    background: none;
+    color: var(--ink);
+  }
+
+  .more summary::after {
+    display: none;
+  }
+
+  /* The facts print even while the disclosure is closed (the script also
+     opens it, for browsers without ::details-content). No slide, or the page
+     could catch it half open. */
+  .more::details-content {
+    block-size: auto;
+    content-visibility: visible;
+    transition: none;
+  }
+
+  .foot-links {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .foot-links a {
+    padding-block: 0.15rem;
+  }
+
+  .entry,
+  .skills > div,
+  .facts > div,
+  .gear li,
+  .records li,
+  .chain,
+  figure,
+  .shot {
+    break-inside: avoid;
+  }
+
+  h2,
+  h3,
+  .sub,
+  .now-head {
+    break-after: avoid;
+  }
+
+  p,
+  li,
+  dd {
+    orphans: 3;
+    widows: 3;
   }
 }

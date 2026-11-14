@@ -4,47 +4,198 @@
   "title": "Design System: bsezen.com",
   "extensions": {
     "colorMeta": {
-      "charcoal-band": { "role": "neutral", "displayName": "Charcoal Band", "canonical": "#211f1d", "tonalRamp": ["#141312", "#211f1d", "#3a3530", "#57514a", "#7a7269", "#a39b90", "#cdc6ba", "#f1ede4"] },
-      "on-band": { "role": "neutral", "displayName": "Band Cream", "canonical": "#f6f3ec" },
-      "on-band-soft": { "role": "neutral", "displayName": "Band Stone", "canonical": "#c2bbaf" },
-      "band-line": { "role": "neutral", "displayName": "Band Seam", "canonical": "#4a443e" },
-      "ember-signal": { "role": "primary", "displayName": "Ember Signal", "canonical": "#e8693a", "tonalRamp": ["#3a1608", "#6a2a10", "#b03c0e", "#d2541f", "#e8693a", "#f0916a", "#f6bea3", "#fbe5da"] },
-      "on-signal": { "role": "neutral", "displayName": "Near-Black Umber", "canonical": "#1c1917" },
-      "warm-paper": { "role": "neutral", "displayName": "Warm Paper", "canonical": "#f6f3ec", "tonalRamp": ["#131211", "#292524", "#57534e", "#8f887d", "#c2bbaf", "#ddd8ce", "#e7e1d5", "#f6f3ec"] },
-      "ink": { "role": "neutral", "displayName": "Umber Ink", "canonical": "#292524" },
-      "muted": { "role": "neutral", "displayName": "Weathered Stone", "canonical": "#57534e" },
-      "rule": { "role": "neutral", "displayName": "Paper Seam", "canonical": "#ddd8ce" },
-      "burnt-link": { "role": "primary", "displayName": "Burnt Orange Link", "canonical": "#b03c0e" },
-      "node-home": { "role": "neutral", "displayName": "Node Home", "canonical": "#3a3530" },
-      "node-outside-edge": { "role": "neutral", "displayName": "Outside Edge", "canonical": "#8a8177" },
-      "node-live-edge": { "role": "primary", "displayName": "Live Edge", "canonical": "#9c5a3c" },
-      "sleeve-paper": { "role": "neutral", "displayName": "Sleeve Paper", "canonical": "#e7e1d5" }
+      "charcoal-band": {
+        "role": "neutral",
+        "displayName": "Charcoal Band",
+        "canonical": "#211f1d",
+        "tonalRamp": [
+          "#141312",
+          "#211f1d",
+          "#3a3530",
+          "#57514a",
+          "#7a7269",
+          "#a39b90",
+          "#cdc6ba",
+          "#f1ede4"
+        ]
+      },
+      "on-band": {
+        "role": "neutral",
+        "displayName": "Band Cream",
+        "canonical": "#f6f3ec"
+      },
+      "on-band-soft": {
+        "role": "neutral",
+        "displayName": "Band Stone",
+        "canonical": "#c2bbaf"
+      },
+      "band-line": {
+        "role": "neutral",
+        "displayName": "Band Seam",
+        "canonical": "#4a443e"
+      },
+      "ember-signal": {
+        "role": "primary",
+        "displayName": "Ember Signal",
+        "canonical": "#e8693a",
+        "tonalRamp": [
+          "#3a1608",
+          "#6a2a10",
+          "#b03c0e",
+          "#d2541f",
+          "#e8693a",
+          "#f0916a",
+          "#f6bea3",
+          "#fbe5da"
+        ]
+      },
+      "on-signal": {
+        "role": "neutral",
+        "displayName": "Near-Black Umber",
+        "canonical": "#1c1917"
+      },
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#f6f3ec",
+        "tonalRamp": [
+          "#131211",
+          "#292524",
+          "#57534e",
+          "#8f887d",
+          "#c2bbaf",
+          "#ddd8ce",
+          "#e7e1d5",
+          "#f6f3ec"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Umber Ink",
+        "canonical": "#292524"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Weathered Stone",
+        "canonical": "#57534e"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Paper Seam",
+        "canonical": "#ddd8ce"
+      },
+      "burnt-link": {
+        "role": "primary",
+        "displayName": "Burnt Orange Link",
+        "canonical": "#b03c0e"
+      },
+      "node-home": {
+        "role": "neutral",
+        "displayName": "Node Home",
+        "canonical": "#3a3530"
+      },
+      "node-outside-edge": {
+        "role": "neutral",
+        "displayName": "Outside Edge",
+        "canonical": "#8a8177"
+      },
+      "node-live-edge": {
+        "role": "primary",
+        "displayName": "Live Edge",
+        "canonical": "#9c5a3c"
+      },
+      "sleeve-paper": {
+        "role": "neutral",
+        "displayName": "Sleeve Paper",
+        "canonical": "#e7e1d5"
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "The name in the hero only." },
-      "headline": { "displayName": "Headline", "purpose": "Feature section titles: platforms, cluster, music." },
-      "title": { "displayName": "Title", "purpose": "List section titles, sticky in the left rail on wide screens." },
-      "entry": { "displayName": "Entry", "purpose": "Role, project or degree name." },
-      "lead": { "displayName": "Lead", "purpose": "Section opening paragraph and hero summary." },
-      "body": { "displayName": "Body", "purpose": "Running text and bullets." },
-      "label": { "displayName": "Label", "purpose": "Small headings above a 2px rule." },
-      "small": { "displayName": "Small", "purpose": "Nav links, metadata, captions." },
-      "mono": { "displayName": "Mono", "purpose": "Commit hash in the footer only." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "The name in the hero only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Feature section titles: platforms, cluster, music."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "List section titles, sticky in the left rail on wide screens."
+      },
+      "entry": {
+        "displayName": "Entry",
+        "purpose": "Role, project or degree name."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Section opening paragraph and hero summary."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text and bullets."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Small headings above a 2px rule."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Nav links, metadata, captions."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Commit hash in the footer only."
+      }
     },
     "shadows": [
-      { "name": "screenshot", "value": "0 1px 2px rgb(20 14 8 / 0.25), 0 18px 40px -12px rgb(20 14 8 / 0.45), 0 40px 80px -30px rgb(20 14 8 / 0.5)", "purpose": "Product screenshots. Add 0 0 0 1px #3a3531 in dark mode." },
-      { "name": "sleeve", "value": "0 1px 2px rgb(20 14 8 / 0.3), 0 12px 24px -12px rgb(20 14 8 / 0.55)", "purpose": "Record sleeves." }
+      {
+        "name": "screenshot",
+        "value": "0 1px 2px rgb(20 14 8 / 0.25), 0 18px 40px -12px rgb(20 14 8 / 0.45), 0 40px 80px -30px rgb(20 14 8 / 0.5)",
+        "purpose": "Product screenshots. Add 0 0 0 1px #3a3531 in dark mode."
+      },
+      {
+        "name": "sleeve",
+        "value": "0 1px 2px rgb(20 14 8 / 0.3), 0 12px 24px -12px rgb(20 14 8 / 0.55)",
+        "purpose": "Record sleeves."
+      }
     ],
     "motion": [
-      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Every transition." },
-      { "name": "duration-ui", "value": "200ms", "purpose": "Buttons, links, arrows." },
-      { "name": "duration-object", "value": "500ms", "purpose": "Screenshot lift and disc slide." },
-      { "name": "rise", "value": "600ms clip-path reveal + 0.35em rise", "purpose": "Hero name, once on load." },
-      { "name": "flow", "value": "1600ms linear infinite", "purpose": "Dashed connectors on the live request path." }
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Every transition."
+      },
+      {
+        "name": "duration-ui",
+        "value": "200ms",
+        "purpose": "Buttons, links, arrows."
+      },
+      {
+        "name": "duration-object",
+        "value": "500ms",
+        "purpose": "Screenshot lift and disc slide."
+      },
+      {
+        "name": "rise",
+        "value": "600ms clip-path reveal + 0.35em rise",
+        "purpose": "Hero name, once on load."
+      },
+      {
+        "name": "flow",
+        "value": "1600ms linear infinite",
+        "purpose": "Dashed connectors on the live request path."
+      }
     ],
     "breakpoints": [
-      { "name": "stack", "value": "44rem" },
-      { "name": "collapse", "value": "60rem" }
+      {
+        "name": "stack",
+        "value": "44rem"
+      },
+      {
+        "name": "collapse",
+        "value": "60rem"
+      }
     ]
   },
   "components": [
@@ -116,13 +267,51 @@
       "Motion is small and physical: things lift, discs slide, the live path flows."
     ],
     "rules": [
-      { "name": "The One Ember Rule", "body": "The signal is the only saturated colour on the page. It marks the main action, interaction states, and live things. It never fills a section, a card or a heading.", "section": "colors" },
-      { "name": "The Quiet Hover Rule", "body": "On the charcoal band, buttons hover to cream (on-band fill, charcoal-band text), not to the signal. Nav links and the Contact pill are the exception: they hover to the signal.", "section": "colors" },
-      { "name": "The Raised Band Rule", "body": "In dark mode the band is lighter than the ground (#2a2724 over #131211), never darker. A band must always read as a separate surface.", "section": "colors" },
-      { "name": "The Weight Ladder Rule", "body": "Hierarchy comes from weight and size, never from colour or uppercase: 800 for titles, 650 to 700 for entries, labels and actions, 400 for reading.", "section": "typography" },
-      { "name": "The Pretty Wrap Rule", "body": "Headings use text-wrap: balance; leads and bullets use text-wrap: pretty. Never ship a one-word last line in a heading.", "section": "typography" },
-      { "name": "The Objects Lift Rule", "body": "Only real objects get shadows. Text blocks, entries, nav, and sections never do. If something new isn't a picture of a thing, it stays flat.", "section": "elevation" },
-      { "name": "The Warm Shadow Rule", "body": "Shadows are tinted toward umber (rgb(20 14 8 / …)), never neutral grey or blue-black.", "section": "elevation" }
+      {
+        "name": "The One Ember Rule",
+        "body": "The signal is the only saturated colour on the page. It marks the main action, interaction states, and live things. It never fills a section, a card or a heading.",
+        "section": "colors"
+      },
+      {
+        "name": "The Quiet Hover Rule",
+        "body": "Hover always raises contrast, never lowers it. On the charcoal band, buttons hover to cream (on-band fill, charcoal-band text). Text links on the band keep their cream text and gain a 2px signal underline; orange text on charcoal is lower contrast than cream. The Contact pill is the one signal fill, since its dark text on the signal stays above 5:1.",
+        "section": "colors"
+      },
+      {
+        "name": "The Raised Band Rule",
+        "body": "In dark mode the band is lighter than the ground (#2a2724 over #131211), never darker. A band must always read as a separate surface.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight Ladder Rule",
+        "body": "Hierarchy comes from weight and size, never from colour or uppercase: 800 for titles, 650 to 700 for entries, labels and actions, 400 for reading.",
+        "section": "typography"
+      },
+      {
+        "name": "The Pretty Wrap Rule",
+        "body": "Headings use text-wrap: balance; leads and bullets use text-wrap: pretty. Never ship a one-word last line in a heading.",
+        "section": "typography"
+      },
+      {
+        "name": "The Ladder Rule",
+        "body": "New spacing takes a step from the scale. If no step fits, the layout is wrong, not the scale.",
+        "section": "layout"
+      },
+      {
+        "name": "The Heading Leads Rule",
+        "body": "There is always more space above a heading than below it, so the heading belongs to what follows it.",
+        "section": "layout"
+      },
+      {
+        "name": "The Objects Lift Rule",
+        "body": "Only real objects get shadows. Text blocks, entries, nav, and sections never do. If something new isn't a picture of a thing, it stays flat.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Warm Shadow Rule",
+        "body": "Shadows are tinted toward umber (rgb(20 14 8 / …)), never neutral grey or blue-black.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "Do keep the ember signal for the main action, interaction states and live things only (The One Ember Rule).",
@@ -132,7 +321,12 @@
       "Do set every new heading in Public Sans Variable at 650 to 800 weight with negative tracking, and balance its wrap.",
       "Do tint shadows warm and give them only to objects (The Objects Lift Rule).",
       "Do use the shared ease-out curve (cubic-bezier(0.16, 1, 0.3, 1)), and turn off every transition and animation under prefers-reduced-motion.",
-      "Do give every focusable element a visible ring: currentColor on paper, the signal on the band."
+      "Do give every focusable element a visible ring: currentColor on paper, the signal on the band.",
+      "Do keep every link and button at least 24×24px (WCAG 2.2, 2.5.8). Go links and nav links get there with vertical padding.",
+      "Do keep the first paint fast. On desktop the largest paint on load is the hero name, so the Public Sans latin file is preloaded. On phones it is the portrait, which carries fetchpriority=\"high\". Anything new above the fold must not push either back.",
+      "Do glue a short last word to the one before it with a non-breaking space (this page. in the hero summary), so no paragraph ends on one stranded word. Keep curly quotes, real dashes and the ellipsis character in copy.",
+      "Do check print (or Save as PDF) after layout changes: light palette, link addresses visible, nothing split across pages.",
+      "Do keep page scripts as separate files. nginx sends a Content-Security-Policy that blocks inline scripts, so astro.config.mjs sets Vite's assetsInlineLimit to 0. A script that works in dev but not in production is probably being inlined."
     ],
     "donts": [
       "Don't add a second accent colour, gradients, or coloured section backgrounds beyond the charcoal band.",

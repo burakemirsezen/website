@@ -59,18 +59,18 @@ typography:
     fontFamily: "Public Sans Variable, system-ui, sans-serif"
     fontSize: "1.0625rem"
     fontWeight: 400
-    lineHeight: 1.6
+    lineHeight: 1.5
     fontFeature: "lnum"
   label:
     fontFamily: "Public Sans Variable, system-ui, sans-serif"
     fontSize: "1rem"
     fontWeight: 700
-    lineHeight: 1.6
+    lineHeight: 1.5
   small:
     fontFamily: "Public Sans Variable, system-ui, sans-serif"
     fontSize: "0.9375rem"
     fontWeight: 400
-    lineHeight: 1.6
+    lineHeight: 1.5
   mono:
     fontFamily: "ui-monospace, Cascadia Mono, SF Mono, Menlo, Consolas, monospace"
     fontSize: "0.95em"
@@ -83,12 +83,19 @@ rounded:
   shot: "0.75rem"
   pill: "999px"
 spacing:
+  3xs: "0.25rem"
+  2xs: "0.5rem"
+  xs: "0.75rem"
+  s: "1rem"
+  m: "1.5rem"
+  l: "clamp(1.75rem, 1.5rem + 1vw, 2.25rem)"
+  xl: "clamp(2rem, 1.5rem + 2.5vw, 3rem)"
+  2xl: "clamp(2.5rem, 1.75rem + 3.75vw, 4rem)"
+  section: "clamp(2.5rem, 2rem + 2.5vw, 3.5rem)"
+  section-lg: "clamp(3.5rem, 2.5rem + 5vw, 6rem)"
   page-gutter: "clamp(1.25rem, 5vw, 3rem)"
-  column-gap: "2.5rem"
-  when-rail: "13rem"
+  rail: "13rem"
   container: "72rem"
-  section-sm: "3rem"
-  section-lg: "clamp(3.5rem, 8vw, 6rem)"
 components:
   button-primary:
     backgroundColor: "{colors.ember-signal}"
@@ -187,7 +194,7 @@ A warm, almost monochrome palette of paper and charcoal, with one hot accent.
 ### Named Rules
 **The One Ember Rule.** The signal is the only saturated colour on the page. It marks the main action, interaction states, and live things. It never fills a section, a card or a heading.
 
-**The Quiet Hover Rule.** On the charcoal band, buttons hover to cream (`on-band` fill, `charcoal-band` text), not to the signal. Nav links and the Contact pill are the exception: they hover to the signal.
+**The Quiet Hover Rule.** Hover always raises contrast, never lowers it. On the charcoal band, buttons hover to cream (`on-band` fill, `charcoal-band` text). Text links on the band keep their cream text and gain a 2px signal underline; orange text on charcoal is lower contrast than cream. The Contact pill is the one signal fill, since its dark text on the signal stays above 5:1.
 
 **The Raised Band Rule.** In dark mode the band is lighter than the ground (`#2a2724` over `#131211`), never darker. A band must always read as a separate surface.
 
@@ -205,7 +212,7 @@ A warm, almost monochrome palette of paper and charcoal, with one hot accent.
 - **Title** (800, clamp 1.5rem to 1.75rem, line-height 1.15, -0.025em): titles of the list sections (Work, Research, Education, Skills), pinned in the left rail on wide screens.
 - **Entry** (650, 1.25rem, line-height 1.3): the name of a role, project or degree.
 - **Lead** (400, clamp 1.15rem to 1.3rem, line-height 1.45, max about 40 to 44rem): the opening paragraph of a section, and the hero summary.
-- **Body** (400, 1.0625rem, line-height 1.6, bullets capped at 42rem): everything else.
+- **Body** (400, 1.0625rem, line-height 1.5, bullets capped at 42rem, which keeps lines at 60 to 80 characters): everything else.
 - **Label** (700, 1rem): small headings such as "Right now", "The setup" and "Favourite records", always above a 2px rule.
 - **Small** (0.9375rem / 0.875rem): nav links, metadata, captions, the build line.
 
@@ -219,12 +226,24 @@ A warm, almost monochrome palette of paper and charcoal, with one hot accent.
 A centred container of 72rem with a fluid gutter (`page-gutter`). The page is one long column of full-bleed bands and paper sections.
 
 - **Hero:** a 1.55fr / 1fr grid. The name, summary and actions sit on the left; the portrait and the "Right now" list sit on the right, aligned to the bottom. Its bottom padding is extra deep, because the first product screenshot overlaps the band edge from below.
-- **Showcase:** a 1.45fr / 1fr grid of screenshots and text. A second, smaller screenshot overlaps the lower-right corner of the first.
-- **List sections:** above 60rem, a two-column grid: a 13rem left rail holds the sticky section title, and the entries fill the rest. Each entry is a two-column grid of title/details and a right-aligned 13rem date column. Below 44rem, the dates move above the title.
+- **Showcase:** a 1.45fr / 1fr grid of screenshots and text. A second, smaller screenshot overlaps the lower-right corner of the first. The Visit row swaps sides on wide screens. Once stacked, both platforms show the screenshot first, then the text.
+- **List sections:** above 60rem, a two-column grid: a 13rem left rail holds the sticky section title, and the entries fill the rest. Each entry is one column: the date as a small muted line, then the title, organisation, bullets and links. There is no separate date column, so the text keeps its full width.
 - **Cluster:** two horizontal chains of nodes joined by connectors. Below 44rem they stack vertically and the connectors turn vertical. The fact list has two columns above 60rem and one below.
 - **Music:** records and gear share a four-column grid, two columns below 60rem.
 - **Rhythm:** sections are separated by a 2px ink rule drawn inside the gutter, so it lines up with the text, never edge to edge. A section that follows a band needs no rule.
 - Breakpoints: 60rem (grids collapse) and 44rem (rows stack, the nav drops its secondary links).
+
+### Spacing scale
+
+Every gap between blocks is one step of the scale in the frontmatter (`3xs` to `2xl`). The steps from `l` up grow with the window. Values smaller than `3xs`, or inside a component's padding, are optical nudges and tap targets, not rhythm.
+
+- **Two section rhythms.** List sections (Work, Research, Education, Skills) pad by `section` above and below. Feature sections and bands (showcase, cluster, music, footer) pad by `section-lg`. Bigger headings get more room.
+- **Inside a block:** heading to lead is `s`, lead to bullets is `m`, bullets to links is `xs` to `s`. Bullet to bullet is `2xs`. Entry to entry is `m` on each side of the rule.
+- **Between blocks inside a section:** `xl` to `2xl`, such as between the lead and the cluster paths, or between the records and the gear.
+
+**The Ladder Rule.** New spacing takes a step from the scale. If no step fits, the layout is wrong, not the scale.
+
+**The Heading Leads Rule.** There is always more space above a heading than below it, so the heading belongs to what follows it.
 
 ## Elevation & Depth
 
@@ -260,7 +279,8 @@ Tactile pills. They lift 2px on hover and settle on press.
 
 ### Navigation
 A sticky charcoal bar the same colour as the hero, so it only reads as a bar once you scroll.
-- Section links: 0.9375rem, weight 600, no underline. On hover they turn signal with a 2px underline.
+- Section links: 0.9375rem, weight 600, no underline. On hover they keep their cream text and gain a 2px signal underline (The Quiet Hover Rule).
+- Current section: while a section crosses a line a third of the way down the window, its link gets `aria-current="location"`: cream text on a 2px signal underline. No link is marked over the hero, the music section or the footer.
 - Contact: an outlined pill on the right that fills with the signal on hover.
 - On phones the links scroll sideways instead of wrapping, and the secondary links (Education, Skills) are hidden.
 
@@ -268,7 +288,16 @@ A sticky charcoal bar the same colour as the hero, so it only reads as a bar onc
 A link with an arrow, used for every outbound "see it" link on the paper. Burnt orange, weight 650, padded to give a tap target. On hover the underline thickens from 1px to 2px and the arrow slides 0.2em to the right.
 
 ### Entries
-A row in a list section: title (Entry style), organisation in muted text, dash bullets, an optional row of go links, and the date in a right column with tabular figures. Entries are separated by 1px paper-seam rules, with no boxes and no backgrounds.
+A row in a list section: the date first (0.9375rem, muted, tabular figures), then the title (Entry style), the organisation in ink (not muted: a scan of the titles alone reads "Software Engineer" twice, and the organisation tells them apart), dash bullets, and an optional row of go links. Entries are separated by 1px paper-seam rules, with no boxes and no backgrounds.
+
+### "Right now" list
+In the hero, under the portrait: a "Right now" label with "Updated <month>" on the right, above a 2px cream rule. Then one row per current role, each with a 1px rule. The update month lives in `nowUpdated` in `src/data/site.ts`; change it whenever the list changes.
+
+### Link preview image
+`public/og.png` (1200×630) is what LinkedIn, Slack and messengers show for a shared link. It has the name in Display style on the charcoal band, a 112px ember rule above it, the tagline in Band Stone, and the domain. Regenerate it with `node scripts/og-image.mjs` after changing the name or tagline.
+
+### Icons
+Three files cover browsers, tools and home screens: `favicon.svg` (the cream B on a charcoal rounded square), `favicon.ico` (32×32) and `apple-touch-icon.png` (180×180, full-bleed square; iOS rounds the corners itself). The SVG is the source; regenerate the other two with `node scripts/icons.mjs`.
 
 ### Screenshots
 Linked product screenshots with the Screenshot shadow and 0.75rem corners. They lift 6px on hover over 500ms. On focus they get a 3px signal ring with a dark band inside, which shows up on every ground.
@@ -277,7 +306,7 @@ Linked product screenshots with the Screenshot shadow and 0.75rem corners. They 
 A row of nodes that shows a real path through the infrastructure.
 - Nodes on the home cluster are solid (`node-home` fill, `node-home-edge` border). Nodes outside it have a dashed `node-outside-edge` border. A legend explains the two.
 - In the live request path the borders warm toward the signal, the last node ("This page") is filled with the signal, and the connectors are dashed signal lines that flow continuously.
-- Extra facts sit behind a `details` disclosure ("More about the setup"), whose summary turns signal on hover.
+- Extra facts sit behind a `details` disclosure ("More about the setup"). Its summary gains a signal underline on hover. The browser triangle is replaced by the same drawn chevron as the go links, pointing down when closed and up when open. Where the browser supports `interpolate-size` and `::details-content`, the facts slide open over 400ms; elsewhere they simply appear. Reduced motion turns the slide off.
 
 ### Record sleeve (signature)
 A square sleeve with a CSS-drawn vinyl disc peeking out on the right. On hover or focus the disc slides further out. The cover photo fills the sleeve; behind it, the sleeve colour cycles through dark umber, charcoal, signal and `sleeve-paper`, and also tints the disc label. The whole record links to the album. Below it sit the title (1.125rem), the artist in muted text, and a "Listen on Spotify" arrow that slides when the record is hovered.
@@ -287,6 +316,9 @@ A product cut-out photo on a faint ink-tinted square tile (7% ink), so dark gear
 
 ### Placeholder slot
 A missing photo shows as a dashed muted border over a fine diagonal hatch, with a plain label. Unwritten text is italic with a dashed underline. Placeholders are meant to look unfinished.
+
+### Print
+Recruiters save pages as PDF, so print is designed, not left to chance. Print always uses the light palette on white, whatever the screen theme. The bands drop their fill and their light text switches to ink. The nav, skip link, second screenshot and Spotify links are hidden. Buttons and footer links print as text followed by their address, and research links print their address in brackets. The portrait is capped at 20rem. The cluster facts behind the disclosure print even when it is closed. Entries, fact rows, chains, figures and screenshots never split across pages, and headings stay with what follows them. Page margins are 16mm by 14mm.
 
 ## Do's and Don'ts
 
@@ -299,6 +331,11 @@ A missing photo shows as a dashed muted border over a fine diagonal hatch, with 
 - **Do** tint shadows warm and give them only to objects (The Objects Lift Rule).
 - **Do** use the shared ease-out curve (`cubic-bezier(0.16, 1, 0.3, 1)`), and turn off every transition and animation under `prefers-reduced-motion`.
 - **Do** give every focusable element a visible ring: currentColor on paper, the signal on the band.
+- **Do** glue a short last word to the one before it with a non-breaking space (`this page.` in the hero summary), so no paragraph ends on one stranded word. Keep curly quotes, real dashes and the ellipsis character in copy.
+- **Do** check print (or Save as PDF) after layout changes: light palette, link addresses visible, nothing split across pages.
+- **Do** keep page scripts as separate files. nginx sends a Content-Security-Policy that blocks inline scripts, so `astro.config.mjs` sets Vite's `assetsInlineLimit` to 0. A script that works in dev but not in production is probably being inlined.
+- **Do** keep every link and button at least 24×24px (WCAG 2.2, 2.5.8). Go links and nav links get there with vertical padding.
+- **Do** keep the first paint fast. On desktop the largest paint on load is the hero name, so the Public Sans latin file is preloaded. On phones it's the portrait, which carries `fetchpriority="high"`. Anything new above the fold must not push either back.
 
 ### Don't:
 - **Don't** add a second accent colour, gradients, or coloured section backgrounds beyond the charcoal band.

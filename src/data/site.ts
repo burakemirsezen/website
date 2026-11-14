@@ -5,7 +5,7 @@ export const person = {
   name: 'Burak Emir Sezen',
   location: 'Zurich, Switzerland',
   summary:
-    'Software engineer. I build software and keep it running: web platforms used by thousands of students and more than 100 companies, deployment tooling for language models on GPU clusters, and the Kubernetes cluster in my flat that serves this page.',
+    'Software engineer and computer science student at ETH Zurich. I build and run web platforms used by thousands of students and more than 100 companies, and deployment tooling for language models on GPU clusters.',
   // TODO: placeholder. Replace with the dedicated mailbox once it exists.
   email: 'hello@bsezen.com',
   github: 'https://github.com/burakemirsezen',
@@ -17,6 +17,10 @@ export const person = {
   // to that commit.
   source: '',
 };
+
+// When the "Right now" list was last checked. Change it whenever the list
+// changes. `iso` is year and month, for the <time> element.
+export const nowUpdated = { label: 'Nov 2026', iso: '2026-11' };
 
 // Shown beside the name.
 export const now = [
@@ -31,6 +35,8 @@ export const featured = {
     name: 'Community Solutions',
     url: 'https://exams.vis.ethz.ch',
     urlLabel: 'exams.vis.ethz.ch',
+    // Public GitHub mirror of the VIS GitLab repository.
+    source: 'https://github.com/VIS-ETH/community-solutions',
     lead: 'The exam platform of ETH computer science students: past exams, community answers, comments, and summaries.',
     points: [
       'I develop and maintain it as part of the VIS engineering team.',
@@ -46,11 +52,13 @@ export const featured = {
     name: 'Visit',
     url: 'https://visit.vis.ethz.ch',
     urlLabel: 'visit.vis.ethz.ch',
+    // Public GitHub mirror of the VIS GitLab repository.
+    source: 'https://github.com/VIS-ETH/visit3',
     imageAlt:
       'Visit bookings overview for VIS staff, with test data: a total in Swiss francs, and a table of booth zones with bookings, free booths, prices and services.',
-    lead: 'The company-relations platform of VIS, in production and used by more than 100 companies.',
+    lead: 'The company portal for the Kontaktparty, the VIS job fair: companies register, book their booths, and add services. In production, used by more than 100 companies.',
     points: [
-      'Designed and built by me across frontend, backend, and database.',
+      'I designed and built it, from frontend to database.',
       'Runs on the VIS infrastructure that I also help administer.',
     ],
   },
@@ -93,12 +101,15 @@ export const cluster = {
 // photo's `id`. To fill text: replace it and delete the `placeholder` flag.
 export const music: {
   lead: string;
-  photos: { id: string; title: string; text: string; placeholder?: boolean }[];
+  // `roomOnly`: shown in the desktop room (and to screen readers) but not in
+  // the phone layout, which only lists gear that has a photo.
+  photos: { id: string; title: string; text: string; placeholder?: boolean; roomOnly?: boolean }[];
   gearTitle: string;
   recordsTitle: string;
   records: { id: string; title: string; artist: string; url: string; placeholder?: boolean }[];
 } = {
-  lead: 'I am learning the guitar, and most evenings end with a record on the turntable.',
+  // No lead under the heading: the room and its caption speak for themselves.
+  lead: '',
   photos: [
     {
       id: 'guitar',
@@ -119,6 +130,12 @@ export const music: {
       id: 'turntable',
       title: 'The turntable',
       text: 'Audio-Technica AT-LP60XBT in black.',
+    },
+    {
+      id: 'speakers',
+      title: 'The speakers',
+      text: 'Edifier R1280DB in wood.',
+      roomOnly: true,
     },
   ],
   gearTitle: 'The setup',
@@ -199,9 +216,9 @@ export const projects: Project[] = [
   },
   {
     name: 'Open-source contributions',
-    context: 'Calibre-Web Automated, Seerr, SearXNG',
-    // Summarises my merged pull requests in these repositories.
-    points: ['Merged bug fixes and a configuration option upstream in three self-hosted applications.'],
+    context: 'Merged upstream pull requests',
+    // Summarises my merged pull requests; the links below are the examples.
+    points: ['Bug fixes and a new configuration option in self-hosted software, for example:'],
     links: [
       { label: 'Calibre-Web Automated', url: 'https://github.com/crocodilestick/Calibre-Web-Automated' },
       { label: 'Seerr', url: 'https://github.com/seerr-team/seerr' },

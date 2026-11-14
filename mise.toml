@@ -1,0 +1,24 @@
+# Toolchain for this site. `mise install` gets the right Node; the image
+# build (Dockerfile) uses the same major version.
+[tools]
+node = "22"
+
+[tasks.install]
+description = "Install npm dependencies"
+run = "npm ci"
+
+[tasks.dev]
+description = "Run the dev server on localhost:4321"
+run = "npm run dev"
+
+[tasks.build]
+description = "Build the static site into dist/"
+run = "npm run build"
+
+[tasks.og]
+description = "Render public/og.png, the link preview image"
+run = "node scripts/og-image.mjs"
+
+[tasks.icons]
+description = "Build favicon.ico and apple-touch-icon.png from favicon.svg"
+run = "node scripts/icons.mjs"

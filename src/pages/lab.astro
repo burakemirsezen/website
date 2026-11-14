@@ -1,0 +1,132 @@
+---
+// DEV ONLY: a turntable stage for the listening room's models, for taking
+// screenshots while modelling. Delete before shipping.
+//
+//   /lab?model=guitar&yaw=30&pitch=10&zoom=1     one model on a studio set
+//   /lab?model=room&mood=day                     the whole room as on the site
+//                                                (mood: day or night; default
+//                                                follows the colour scheme)
+//
+// Models: guitar, amp, interface, turntable, speaker, room.
+// window.__labReady becomes true once the frame is rendered.
+import record1 from '../assets/record-1.jpg';
+import record2 from '../assets/record-2.jpg';
+import record3 from '../assets/record-3.jpg';
+import record4 from '../assets/record-4.jpg';
+import { music } from '../data/site';
+const covers = JSON.stringify([record1, record2, record3, record4].map((r) => r.src));
+const records = JSON.stringify(music.records.map(({ title, artist, url }) => ({ title, artist, url })));
+const gear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, text }) => [id, { title, text }])));
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Room lab</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #ece6db;
+      }
+      #stage {
+        position: relative;
+        width: 100vw;
+      }
+      .room {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage" data-covers={covers} data-records={records} data-gear={gear}></div>
+    <script>
+      import { THREE } from '../scripts/room/kit';
+      import { buildGuitar } from '../scripts/room/guitar';
+      import { buildAmp } from '../scripts/room/amp';
+      import { buildInterface } from '../scripts/room/interface';
+      import { buildTurntable } from '../scripts/room/turntable';
+      import { buildSpeaker } from '../scripts/room/speakers';
+      import { mountRoom } from '../scripts/room/scene';
+
+      const q = new URLSearchParams(location.search);
+      const which = q.get('model') ?? 'guitar';
+      const stage = document.getElementById('stage')!;
+      const covers: string[] = JSON.parse(stage.dataset.covers ?? '[]');
+
+      if (which === 'room') {
+        const mood = q.get('mood');
+        // Kept on window so the renderer's stats can be read (renderer.info).
+        (window as any).__room = mountRoom(stage, {
+          covers,
+          reducedMotion: q.get('motion') !== 'on',
+          mood: mood === 'day' || mood === 'night' ? mood : undefined,
+          records: JSON.parse(stage.dataset.records ?? '[]'),
+          gear: JSON.parse(stage.dataset.gear ?? '{}'),
+        });
+        setTimeout(() => ((window as any).__labReady = true), 2500);
+      } else {
+        const cover = new THREE.TextureLoader().load(covers[0]);
+        cover.colorSpace = THREE.SRGBColorSpace;
+        const builders: Record<string, () => THREE.Object3D> = {
+          guitar: buildGuitar,
+          amp: buildAmp,
+          interface: buildInterface,
+          turntable: () => buildTurntable(cover).group,
+          speaker: () => buildSpeaker('left'),
+        };
+        const model = builders[which]();
+        const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setPixelRatio(1);
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        stage.append(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xece6db);
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ color: 0xd8d0c2, roughness: 1 }));
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+        scene.add(new THREE.HemisphereLight(0xfff6e8, 0x8a7a66, 1.1));
+        const key = new THREE.DirectionalLight(0xffffff, 2.4);
+        key.position.set(2, 4, 3);
+        key.castShadow = true;
+        key.shadow.mapSize.set(2048, 2048);
+        scene.add(key);
+        const rim = new THREE.DirectionalLight(0xfff0e0, 1.2);
+        rim.position.set(-3, 2, -2);
+        scene.add(rim);
+        scene.add(model);
+
+        // Frame the model from its bounding box.
+        const bounds = new THREE.Box3().setFromObject(model);
+        const size = bounds.getSize(new THREE.Vector3());
+        const centre = bounds.getCenter(new THREE.Vector3());
+        const radius = size.length() / 2;
+        const yaw = THREE.MathUtils.degToRad(Number(q.get('yaw') ?? 25));
+        const pitch = THREE.MathUtils.degToRad(Number(q.get('pitch') ?? 12));
+        const zoom = Number(q.get('zoom') ?? 1);
+        const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.01, 100);
+        const dist = (radius / Math.sin(THREE.MathUtils.degToRad(15))) / zoom;
+        camera.position.set(
+          centre.x + dist * Math.sin(yaw) * Math.cos(pitch),
+          centre.y + dist * Math.sin(pitch),
+          centre.z + dist * Math.cos(yaw) * Math.cos(pitch),
+        );
+        camera.lookAt(centre);
+        const draw = () => renderer.render(scene, camera);
+        draw();
+        setTimeout(() => {
+          draw();
+          (window as any).__labReady = true;
+        }, 1500);
+        console.log('size (m):', size.x.toFixed(3), size.y.toFixed(3), size.z.toFixed(3));
+      }
+    </script>
+  </body>
+</html>

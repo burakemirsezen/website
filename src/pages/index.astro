@@ -1,5 +1,8 @@
 ---
 import '@fontsource-variable/public-sans';
+// The same file the font's CSS points to, preloaded below because the name in
+// the hero is the largest thing painted on desktop and waits for this font.
+import publicSansLatin from '@fontsource-variable/public-sans/files/public-sans-latin-wght-normal.woff2?url';
 import '../styles/global.css';
 import { execSync } from 'node:child_process';
 import { Image } from 'astro:assets';
@@ -15,7 +18,7 @@ import record1 from '../assets/record-1.jpg';
 import record2 from '../assets/record-2.jpg';
 import record3 from '../assets/record-3.jpg';
 import record4 from '../assets/record-4.jpg';
-import { person, now, featured, cluster, music, work, projects, education, skills } from '../data/site';
+import { person, now, nowUpdated, featured, cluster, music, work, projects, education, skills } from '../data/site';
 
 const description =
   'Burak Emir Sezen: software engineer, MSc Computer Science student at ETH Zurich.';
@@ -32,6 +35,13 @@ function commitSha(): string | undefined {
   }
 }
 const sha = commitSha();
+
+// The masthead sets the name on two lines: all but the last word, then the
+// last word, which leaves room for the portrait strip beside it.
+const nameWords = person.name.split(' ');
+const lastLine = nameWords.pop();
+const firstLine = nameWords.join(' ');
+const builtAt = new Date().toISOString();
 const builtOn = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Zurich' });
 
 // Jump links at the top of the page, in page order.
@@ -51,6 +61,29 @@ const coreFacts = ['Compute', 'Deploys', 'Workloads', 'Secrets'];
 // Photos, keyed by id: `portrait` for the hero, and the ids in `music`
 // (src/data/site.ts) for the music section. Missing ones show a dashed slot.
 // Example: import guitar from "../assets/guitar.jpg"; then add `guitar` here.
+// Labels for the WebGL room's hover notes, from the same data as the lists.
+const roomRecords = JSON.stringify(music.records.map(({ title, artist, url }) => ({ title, artist, url })));
+const roomGear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, text }) => [id, { title, text }])));
+
+// Structured data for search engines (schema.org ProfilePage with a Person),
+// built from the same data as the page. `<` is escaped so the JSON cannot
+// close the script tag.
+const profile = {
+  '@context': 'https://schema.org',
+  '@type': 'ProfilePage',
+  mainEntity: {
+    '@type': 'Person',
+    name: person.name,
+    url: Astro.site?.href,
+    jobTitle: 'Software engineer',
+    description,
+    homeLocation: { '@type': 'Place', name: person.location },
+    alumniOf: { '@type': 'CollegeOrUniversity', name: 'ETH Zurich' },
+    sameAs: [person.github, person.linkedin],
+  },
+};
+const profileJson = JSON.stringify(profile).replace(/</g, '\\u003c');
+
 const photos: Record<string, ImageMetadata | undefined> = {
   portrait,
   guitar: gearGuitar,
@@ -69,15 +102,28 @@ const photos: Record<string, ImageMetadata | undefined> = {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{person.name}</title>
+    <title>{`${person.name}, software engineer`}</title>
     <meta name="description" content={description} />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#211f1d" />
+    <!-- Browser chrome matches the band, which is lighter in dark mode. -->
+    <meta name="theme-color" content="#211f1d" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#2a2724" media="(prefers-color-scheme: dark)" />
+    <link rel="preload" href={publicSansLatin} as="font" type="font/woff2" crossorigin />
+    <!-- Icons: ICO for older tools, SVG for browsers, PNG for iOS. See scripts/icons.mjs. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="canonical" href={Astro.site} />
     <meta property="og:title" content={person.name} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="profile" />
+    <meta property="og:url" content={Astro.site} />
+    <meta property="og:image" content={new URL('/og.png', Astro.site)} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={`${person.name}, software engineer`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json" is:inline set:html={profileJson} />
   </head>
   <body>
     <a class="skip" href="#platforms">Skip to the work</a>
@@ -92,9 +138,34 @@ const photos: Record<string, ImageMetadata | undefined> = {
     </nav>
 
     <header class="hero">
+      <!-- The masthead: the name set as a poster across the full width, with
+           the portrait cut as a strip into the space after "Sezen". -->
+      <div class="wrap masthead">
+        <h1><span>{firstLine}</span> <span>{lastLine}</span></h1>
+        <figure class="portrait-fig">
+          {
+            photos.portrait ? (
+              <Image
+                class="portrait"
+                src={photos.portrait}
+                alt={`${person.name} on a terrace above the roofs and church towers of Zurich`}
+                widths={[480, 800, 1200, 1600]}
+                sizes="(min-width: 44rem) 45vw, 100vw"
+                loading="eager"
+                fetchpriority="high"
+              />
+            ) : (
+              <div class="portrait slot" role="img" aria-label="Photo placeholder: portrait">
+                <span>Photo: portrait</span>
+              </div>
+            )
+          }
+          {photos.portrait && <figcaption class="sr">{person.portraitCaption}</figcaption>}
+        </figure>
+      </div>
+
       <div class="wrap hero-grid">
         <div class="hero-main">
-          <h1>{person.name}</h1>
           <p class="summary">{person.summary}</p>
           <ul class="actions">
             <li><a class="btn solid" href={`mailto:${person.email}`}>{person.email}</a></li>
@@ -103,26 +174,10 @@ const photos: Record<string, ImageMetadata | undefined> = {
           </ul>
         </div>
         <div class="now">
-          <figure class="portrait-fig">
-            {
-              photos.portrait ? (
-                <Image
-                  class="portrait"
-                  src={photos.portrait}
-                  alt={`${person.name} on a terrace above the roofs and church towers of Zurich`}
-                  widths={[480, 800, 1200]}
-                  sizes="(min-width: 60rem) 28rem, 100vw"
-                  loading="eager"
-                />
-              ) : (
-                <div class="portrait slot" role="img" aria-label="Photo placeholder: portrait">
-                  <span>Photo: portrait</span>
-                </div>
-              )
-            }
-            {photos.portrait && <figcaption>{person.portraitCaption}</figcaption>}
-          </figure>
-          <h2>Right now</h2>
+          <div class="now-head">
+            <h2>Right now</h2>
+            <p class="now-updated">Updated <time datetime={nowUpdated.iso}>{nowUpdated.label}</time></p>
+          </div>
           <ul>
             {
               now.map((item) => (
@@ -168,7 +223,10 @@ const photos: Record<string, ImageMetadata | undefined> = {
             <ul class="ticks">
               {cs.points.map((point) => <li>{point}</li>)}
             </ul>
-            <p><a class="go" href={cs.url}>{cs.urlLabel}</a></p>
+            <ul class="links">
+              <li><a class="go url" href={cs.url}>{cs.urlLabel}</a></li>
+              <li><a class="go" href={cs.source}>Source on GitHub</a></li>
+            </ul>
           </div>
         </div>
         <div class="wrap visit">
@@ -178,7 +236,10 @@ const photos: Record<string, ImageMetadata | undefined> = {
             <ul class="ticks">
               {featured.visit.points.map((point) => <li>{point}</li>)}
             </ul>
-            <p><a class="go" href={featured.visit.url}>{featured.visit.urlLabel}</a></p>
+            <ul class="links">
+              <li><a class="go url" href={featured.visit.url}>{featured.visit.urlLabel}</a></li>
+              <li><a class="go" href={featured.visit.source}>Source on GitHub</a></li>
+            </ul>
           </div>
           <a class="shot visit-shot" href={featured.visit.url} aria-label={`Open ${featured.visit.name}`}>
             <Image
@@ -226,22 +287,41 @@ const photos: Record<string, ImageMetadata | undefined> = {
           <p class="lead">{cluster.lead}</p>
 
           <div class="paths">
+            <!-- The key, drawn as two tiny nodes, sits above both paths. -->
+            <p class="legend">
+              <span><i class="key home"></i>In my flat</span>
+              <span><i class="key"></i>Outside it</span>
+            </p>
             <div class="path">
               <h3>How this page reached you</h3>
               <ol class="chain live">
-                {cluster.request.map((s) => <li class:list={{ home: s.home }}>{s.step}{s.home && <span class="sr"> (on the home cluster)</span>}</li>)}
+                {
+                  cluster.request.map((s, i) => (
+                    <li class:list={{ home: s.home }} style={`--i: ${i}`}>
+                      <span data-hop={s.step}>{s.step}</span>
+                      {s.home && <span class="sr"> (on the home cluster)</span>}
+                    </li>
+                  ))
+                }
               </ol>
+              <!-- Filled in by the script with this visit's real numbers. -->
+              <p class="chain-meta" data-trace-meta hidden></p>
             </div>
             <div class="path">
               <h3>How a change gets deployed</h3>
               <ol class="chain">
                 {cluster.deploy.map((s) => <li class:list={{ home: s.home }}>{s.step}{s.home && <span class="sr"> (on the home cluster)</span>}</li>)}
               </ol>
+              <!-- This build's commit and age; the script keeps the age current. -->
+              {
+                sha && (
+                  <p class="chain-meta">
+                    This version: commit <code>{sha.slice(0, 7)}</code>, built{' '}
+                    <time datetime={builtAt} data-built-ago>{builtOn}</time>.
+                  </p>
+                )
+              }
             </div>
-            <p class="legend">
-              <span><i class="key home"></i>Runs on the home cluster</span>
-              <span><i class="key"></i>Outside it</span>
-            </p>
           </div>
 
           <dl class="facts">
@@ -339,68 +419,91 @@ const photos: Record<string, ImageMetadata | undefined> = {
 
       <section id="outside" class="music" aria-labelledby="outside-h">
         <div class="wrap">
-          <h2 id="outside-h">Outside work: music</h2>
-          <p class="lead">{music.lead}</p>
+          <h2 id="outside-h">Music</h2>
 
-          <h3 class="sub">{music.recordsTitle}</h3>
-          <ul class="records">
-            {
-              music.records.map((record) => (
-                <li>
-                  <a class="record-link" href={record.url}>
-                    <div class="record">
-                      <div class="disc" aria-hidden="true" />
-                      <div class="sleeve">
-                        {photos[record.id] && (
-                          <Image
-                            src={photos[record.id]}
-                            alt=""
-                            widths={[320, 640, 960]}
-                            sizes="(min-width: 60rem) 15rem, 46vw"
-                          />
-                        )}
+          <!-- Desktop only: the listening corner as a 3D room (WebGL, loaded
+               when the section comes near). It repeats what the lists below
+               say, so it is hidden from assistive tech; the lists carry the
+               real links. Once the room is up, hovering an object labels it,
+               and the lists are only visually hidden (they show again when a
+               keyboard user tabs into them). If it cannot load, the stage and
+               its hint go and the lists show as on phones. -->
+          <div class="room-stage" aria-hidden="true" data-records={roomRecords} data-gear={roomGear}>
+            <div class="room-loader"></div>
+          </div>
+          <p class="room-hint">Hover over things for details. Records open on Spotify.</p>
+
+          <div class="music-list">
+            <h3 class="sub">{music.recordsTitle}</h3>
+            <ul class="records">
+              {
+                music.records.map((record) => (
+                  <li>
+                    <a class="record-link" href={record.url}>
+                      <div class="record">
+                        <div class="disc" aria-hidden="true" />
+                        <div class="sleeve">
+                          {photos[record.id] && (
+                            <Image
+                              src={photos[record.id]}
+                              alt=""
+                              widths={[320, 640, 960]}
+                              sizes="(min-width: 60rem) 15rem, 46vw"
+                            />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <p class="record-cap">
-                      <strong>{record.title}</strong>
-                      <span>{record.artist}</span>
-                      <span class="listen">Listen on Spotify</span>
-                    </p>
-                  </a>
-                </li>
-              ))
-            }
-          </ul>
+                      <p class="record-cap">
+                        <strong>{record.title}</strong>
+                        <span>{record.artist}</span>
+                        <span class="listen">Listen on Spotify</span>
+                      </p>
+                    </a>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
 
-          <h3 class="sub">{music.gearTitle}</h3>
-          <ul class="gear">
-            {
-              music.photos.map((item) => (
-                <li>
-                  {photos[item.id] && (
-                    <Image
-                      src={photos[item.id]}
-                      alt=""
-                      widths={[320, 640]}
-                      sizes="(min-width: 60rem) 15rem, 42vw"
-                    />
-                  )}
-                  <div>
-                    <strong>{item.title}</strong>
-                    <span class:list={{ todo: item.placeholder }}>{item.text}</span>
-                  </div>
-                </li>
-              ))
-            }
-          </ul>
+          <div class="music-list">
+            <h3 class="sub">{music.gearTitle}</h3>
+            <!-- The desk: each object stands on one shared line, sized roughly
+                 by its real size, with its label underneath. -->
+            <ul class="gear">
+              {
+                music.photos.map((item) => (
+                  <li data-gear={item.id} data-room-only={item.roomOnly ? '' : undefined}>
+                    <div class="gear-obj">
+                      {photos[item.id] && (
+                        <Image
+                          src={photos[item.id]}
+                          alt=""
+                          widths={[320, 640, 960]}
+                          sizes="(min-width: 60rem) 22rem, 46vw"
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span class:list={{ todo: item.placeholder }}>{item.text}</span>
+                    </div>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
         </div>
       </section>
     </main>
 
     <footer id="contact" class="foot">
       <div class="wrap">
-        <p class="foot-cta">
-          Hiring, or want to talk about any of this? <a href={`mailto:${person.email}`}>{person.email}</a>
+        <!-- The closing poster: the address set as large as the name at the
+             top. Its size comes from its length (--chars), so it fits the
+             width whatever the address is. -->
+        <p class="foot-cta">Get in touch.</p>
+        <p class="foot-mail" style={`--chars: ${person.email.length}`}>
+          <a href={`mailto:${person.email}`}>{person.email}</a>
         </p>
         <ul class="foot-links">
           <li><a href={person.github} rel="me">GitHub</a></li>
@@ -418,5 +521,163 @@ const photos: Record<string, ImageMetadata | undefined> = {
         </p>
       </div>
     </footer>
+
+    <script>
+      // Marks the nav link of the section in view. A section counts as in
+      // view while it crosses a thin band a third of the way down the window.
+      const links = new Map(
+        [...document.querySelectorAll<HTMLAnchorElement>('.top ul a')].map((a) => [a.hash.slice(1), a]),
+      );
+      const visible = new Set<string>();
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) visible.add(entry.target.id);
+            else visible.delete(entry.target.id);
+          }
+          // Of the sections in the band, the one furthest down the page wins.
+          const current = [...links.keys()].filter((id) => visible.has(id)).pop();
+          for (const [id, a] of links) {
+            if (id === current) a.setAttribute('aria-current', 'location');
+            else a.removeAttribute('aria-current');
+          }
+        },
+        { rootMargin: '-33% 0px -66% 0px' },
+      );
+      for (const id of links.keys()) {
+        const section = document.getElementById(id);
+        if (section) observer.observe(section);
+      }
+
+      // Live trace in the cluster section. Cloudflare answers /cdn-cgi/trace
+      // on every proxied site with the edge location ("colo=ZRH"); the browser
+      // knows when the first byte of this page arrived. Both are real, so both
+      // are optional: without them the path keeps its plain labels.
+      const meta = document.querySelector<HTMLElement>('[data-trace-meta]');
+      const edge = document.querySelector<HTMLElement>('[data-hop="Cloudflare"]');
+      const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+      const firstByte = nav && nav.responseStart > 0 ? Math.round(nav.responseStart) : undefined;
+      if (meta && firstByte) {
+        meta.textContent = `This visit: first byte after ${firstByte} ms.`;
+        meta.hidden = false;
+      }
+      fetch('/cdn-cgi/trace')
+        .then((r) => (r.ok ? r.text() : ''))
+        .then((text) => {
+          const colo = /^colo=([A-Z]{3})$/m.exec(text)?.[1];
+          if (edge && colo) edge.textContent = `Cloudflare ${colo}`;
+        })
+        .catch(() => {});
+
+      // "built 3 hours ago": the build time is baked in; the age is worked
+      // out here, so the line stays true without a rebuild.
+      const built = document.querySelector<HTMLTimeElement>('[data-built-ago]');
+      if (built) {
+        const minutes = (Date.now() - Date.parse(built.dateTime)) / 60000;
+        const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+        const [value, unit]: [number, Intl.RelativeTimeFormatUnit] =
+          minutes < 60 ? [Math.round(minutes), 'minute'] : minutes < 1440 ? [Math.round(minutes / 60), 'hour'] : [Math.round(minutes / 1440), 'day'];
+        if (minutes >= 0) built.textContent = rtf.format(-Math.max(value, 1), unit);
+      }
+
+      // The live path lights up hop by hop the first time it scrolls into view.
+      const live = document.querySelector('.chain.live');
+      if (live) {
+        live.classList.add('dim');
+        new IntersectionObserver(
+          (entries, obs) => {
+            if (entries.some((e) => e.isIntersecting)) {
+              live.classList.replace('dim', 'lit');
+              obs.disconnect();
+            }
+          },
+          { threshold: 0.6 },
+        ).observe(live);
+      }
+
+      // On desktop, the listening room: a WebGL scene, fetched only when the
+      // section comes within a screen of view, so the top of the page never
+      // waits for it. While it loads the stage shows a quiet fill, and after
+      // 200 ms a breathing ember dot (kept at least 400 ms once shown, so it
+      // never flickers). The canvas fades in on its first frame. Without
+      // WebGL2, on any error, or with no first frame 8 s after the load
+      // started, the room is given up for this page view (a late load is
+      // thrown away) and the lists show instead, as on phones.
+      const stage = document.querySelector<HTMLElement>('.room-stage');
+      const music = document.querySelector<HTMLElement>('#outside');
+      if (stage && music && matchMedia('(min-width: 60.0625rem)').matches) {
+        let state: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+        let dispose: (() => void) | undefined;
+        let showLoader = 0;
+        const fail = () => {
+          if (state === 'failed' || state === 'ready') return;
+          state = 'failed';
+          clearTimeout(showLoader);
+          dispose?.();
+          stage.classList.remove('is-loading', 'is-ready', 'has-gl');
+          music.classList.add('room-failed');
+        };
+        const load = async () => {
+          state = 'loading';
+          let shownAt = 0;
+          showLoader = window.setTimeout(() => {
+            stage.classList.add('is-loading');
+            shownAt = performance.now();
+          }, 200);
+          const giveUp = setTimeout(fail, 8000);
+          const reveal = () => {
+            if (state !== 'loading') return;
+            state = 'ready';
+            clearTimeout(giveUp);
+            clearTimeout(showLoader);
+            const wait = shownAt ? Math.max(0, shownAt + 400 - performance.now()) : 0;
+            stage.classList.add('has-gl');
+            setTimeout(() => {
+              stage.classList.remove('is-loading');
+              stage.classList.add('is-ready');
+            }, wait);
+          };
+          try {
+            const { mountRoom } = await import('../scripts/room/scene');
+            if (state !== 'loading') return;
+            const covers = [...music.querySelectorAll<HTMLImageElement>('.records img')].map((img) => img.currentSrc || img.src);
+            const room = mountRoom(stage, {
+              covers,
+              reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+              records: JSON.parse(stage.dataset.records ?? '[]'),
+              gear: JSON.parse(stage.dataset.gear ?? '{}'),
+              onReady: reveal,
+            });
+            dispose = room.dispose;
+            if (state === 'failed') room.dispose();
+          } catch {
+            fail();
+          }
+        };
+        if (!document.createElement('canvas').getContext('webgl2')) {
+          fail();
+        } else {
+          const near = new IntersectionObserver(
+            (entries, obs) => {
+              if (!entries.some((e) => e.isIntersecting)) return;
+              obs.disconnect();
+              load();
+            },
+            { rootMargin: '100% 0px' },
+          );
+          near.observe(stage);
+        }
+      }
+
+      // Printing opens the "More about the setup" facts so they are on paper
+      // too, then restores whatever the reader had.
+      const more = [...document.querySelectorAll<HTMLDetailsElement>('details.more')];
+      let wasOpen: boolean[] = [];
+      addEventListener('beforeprint', () => {
+        wasOpen = more.map((d) => d.open);
+        for (const d of more) d.open = true;
+      });
+      addEventListener('afterprint', () => more.forEach((d, i) => (d.open = wasOpen[i] ?? d.open)));
+    </script>
   </body>
 </html>
