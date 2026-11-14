@@ -6,11 +6,10 @@ COPY . .
 # Shown in the page footer. The CI workflow passes the commit being built.
 ARG COMMIT_SHA
 ENV COMMIT_SHA=$COMMIT_SHA
-RUN npm run build
+RUN npm run build && mkdir -p /app/dist/records
 
 # Runs as UID 101 and listens on 8080, so it needs no root and no capabilities.
 FROM nginxinc/nginx-unprivileged:1.29-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-RUN mkdir -p /usr/share/nginx/html/records
 EXPOSE 8080
