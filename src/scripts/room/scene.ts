@@ -1903,13 +1903,16 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   // start to finish as the tonearm tracks inward from the outer rim to the
   // label. Unlocked in the click handler so browsers allow playback several
   // seconds later when the stylus actually touches down in the groove.
+  const AUDIO_VOLUME = 0.25;
   const audio = new Audio();
   audio.preload = 'auto';
+  audio.volume = AUDIO_VOLUME;
   const nextAudio = new Audio();
   nextAudio.preload = 'auto';
   let audioRecord = -1;
   let trackIndex = 0;
   let needleDown = false;
+  let fadeTimer = 0;
   let playPromise: Promise<void> | undefined;
 
   function tracksOf(i: number) {
@@ -1992,6 +1995,26 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     );
   }
 
+  function fadeInAudio() {
+    clearInterval(fadeTimer);
+    fadeTimer = 0;
+    audio.volume = 0;
+    const t0 = performance.now();
+    fadeTimer = window.setInterval(() => {
+      if (disposed || !needleDown) {
+        clearInterval(fadeTimer);
+        fadeTimer = 0;
+        return;
+      }
+      const k = clamp01((performance.now() - t0) / 450);
+      audio.volume = AUDIO_VOLUME * k * k;
+      if (k >= 1) {
+        clearInterval(fadeTimer);
+        fadeTimer = 0;
+      }
+    }, 16);
+  }
+
   function startAudio(i: number) {
     const list = tracksOf(i);
     if (!list.length) return;
@@ -2005,6 +2028,7 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     }
     preloadNext(i, trackIndex);
     refreshTip();
+    fadeInAudio();
     audio.muted = false;
     if (!playPromise && audio.paused) {
       playPromise = audio.play().then(
@@ -2020,6 +2044,8 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   }
 
   function stopAudio() {
+    clearInterval(fadeTimer);
+    fadeTimer = 0;
     if (playPromise) audio.muted = true;
     else audio.pause();
   }
@@ -2040,6 +2066,9 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
           await startPlayback();
         });
       } else {
+        clearInterval(fadeTimer);
+        fadeTimer = 0;
+        audio.volume = AUDIO_VOLUME;
         trackIndex++;
         audio.src = list[trackIndex].url;
         audio.currentTime = 0;
@@ -2755,6 +2784,8 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     dots.remove();
     tweens.clear();
     needleDown = false;
+    clearInterval(fadeTimer);
+    fadeTimer = 0;
     audio.removeEventListener('timeupdate', updateNowTime);
     audio.removeEventListener('loadedmetadata', updateNowTime);
     audio.pause();

@@ -121,7 +121,6 @@ function pollPod(panel: HTMLElement, section: HTMLElement, coloPromise: Promise<
       if (rtts.length > SAMPLES) rtts.shift();
       const pod = cellOf(panel, 'pod');
       if (pod) pod.textContent = data.pod;
-      draw(panel, rtts);
       // Optional: the pod's own nginx counters.
       await counters(panel).catch(() => {});
       failures = 0;
@@ -130,6 +129,7 @@ function pollPod(panel: HTMLElement, section: HTMLElement, coloPromise: Promise<
         shown = true;
         panel.hidden = false;
       }
+      draw(panel, rtts);
       panel.classList.remove('beat');
       void panel.offsetWidth;
       panel.classList.add('beat');
@@ -209,8 +209,9 @@ function draw(panel: HTMLElement, rtts: number[]): void {
   // Draw in the SVG's real pixel size, so the line keeps its proportions and
   // the dot stays round at any width.
   const box = svg.getBoundingClientRect();
-  const w = Math.max(1, Math.round(box.width));
-  const h = Math.max(1, Math.round(box.height));
+  const w = Math.round(box.width);
+  const h = Math.round(box.height);
+  if (w <= 8 || h <= 10) return;
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   const base = svg.querySelector('line');
   base?.setAttribute('x2', String(w));
