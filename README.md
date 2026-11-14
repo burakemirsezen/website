@@ -21,13 +21,18 @@ npm run build    # static output in dist/
 
 Astro 5 is used because Astro 7 needs Node 22.23.4 or newer.
 
-### Photos
+### Photos and record audio
 
 The portrait is `src/assets/portrait.jpg`. Gear photos and record covers are
 optional: put the file in `src/assets`, import it in `src/pages/index.astro`,
 and add it to the `photos` map there under its id (`guitar`, `amp`,
 `interface`, `turntable`, `record-1` to `record-4`). Without a photo, a gear item shows as
 text only and a record shows its title and artist on a coloured sleeve.
+
+Record audio files are self-hosted and served under `/records/`:
+- In production, audio files are mounted from an NFS share into `/usr/share/nginx/html/records` inside the container and served at `/records/<album-slug>/<NN>-<track-slug>.mp3`.
+- For local development, place the files in `public/records/<album-slug>/<NN>-<track-slug>.mp3` (Astro serves files in `public/` at the root).
+- Track metadata, durations, and LP sides (`side: 'A' | 'B'`) are defined in `src/data/site.ts`.
 
 ### Version stamp
 

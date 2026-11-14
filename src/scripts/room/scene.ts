@@ -19,9 +19,17 @@ import { buildTurntable } from './turntable';
 import { buildSpeaker } from './speakers';
 import { applyBake } from './lightbake';
 
+export interface RoomTrack {
+  title: string;
+  url: string;
+  duration: number;
+  side?: 'A' | 'B';
+}
+
 export interface RoomRecord {
   title: string;
   artist: string;
+  tracks?: RoomTrack[];
   url: string;
 }
 
@@ -1825,6 +1833,15 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     }
     tipTitle.textContent = h.info.title;
     tipText.textContent = h.info.text;
+    if (held >= 0 && recordInfo[held] && playing) {
+      const r = recordInfo[held];
+      const idx = audioRecord === held ? trackIndex : 0;
+      if (h.key === 'turntable') {
+        tipText.textContent = `${r.title} (${r.artist}) — ${sideTrackLabel(held, idx)}`;
+      } else if (h.record !== undefined && h.record === held) {
+        tipText.textContent = `${r.artist} · Playing ${sideTrackLabel(held, idx)}`;
+      }
+    }
     const act = actionFor(h);
     tipListen.textContent = act ?? '';
     tipListen.hidden = !act;
@@ -1836,10 +1853,10 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
 
   // Click a sleeve and its record slides out of the top of the sleeve, is
   // carried over to the turntable on a curve, turns flat, hovers a moment over
-  // the spindle, is lowered on and settles; then the platter spins up and the
-  // tonearm lifts, swings in and is lowered into the groove. Click it (or the
-  // turntable) again to lift the arm and stop. Nothing is heard; it is the
-  // room that plays. The album itself opens from the note below.
+  // the spindle, is lowered on and settles; then the platter spins up, the
+  // tonearm lifts, swings in and is lowered into the groove, and the record's
+  // MP3 plays once the stylus lands. Click it (or the turntable) again to lift
+  // the arm and stop. The album itself opens from the note below.
   //
   // Everything is time-based (the frame's dt, clamped), built from small
   // "steps": a step takes a progress 0..1 and sets the pose for it, so the
@@ -1869,6 +1886,8 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   /** Which record's disc is out of its sleeve (on the platter); the first is already on. */
   let held = 0;
   let playing = false;
+  let discSide: 'A' | 'B' = 'A';
+  let discFlip = 0;
   let spinSpeed = 0; // 0..1 of 33 1/3 rpm
   let spinAngle = 0;
   let armYaw = 0;
@@ -1879,6 +1898,168 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   let pendingAct: (() => Promise<void>) | undefined;
   /** What `startPlayback` waits for before the needle drops and the platter turns. */
   let playGate: () => Promise<unknown> = () => Promise.resolve();
+
+  // Audio for the record on the platter: plays the album's tracks in order from
+  // start to finish as the tonearm tracks inward from the outer rim to the
+  // label. Unlocked in the click handler so browsers allow playback several
+  // seconds later when the stylus actually touches down in the groove.
+  const audio = new Audio();
+  audio.preload = 'auto';
+  const nextAudio = new Audio();
+  nextAudio.preload = 'auto';
+  let audioRecord = -1;
+  let trackIndex = 0;
+  let needleDown = false;
+  let playPromise: Promise<void> | undefined;
+
+  function tracksOf(i: number) {
+    return recordInfo[i]?.tracks ?? [];
+  }
+
+  function sideOf(i: number, t: number): 'A' | 'B' {
+    const list = tracksOf(i);
+    return list[t]?.side ?? (t < Math.ceil(list.length / 2) ? 'A' : 'B');
+  }
+
+  function sideTrackLabel(i: number, t: number): string {
+    const list = tracksOf(i);
+    const track = list[t];
+    if (!track) return '';
+    const side = sideOf(i, t);
+    let sideNum = 0;
+    for (let k = 0; k <= t; k++) {
+      if (sideOf(i, k) === side) sideNum++;
+    }
+    return `${side}${sideNum} · ${track.title}`;
+  }
+
+  function preloadNext(i: number, t: number) {
+    const next = tracksOf(i)[t + 1];
+    if (next && nextAudio.src !== next.url) {
+      nextAudio.src = next.url;
+      nextAudio.load();
+    }
+  }
+
+  /** Progress 0..1 across the current side's tracks, from outer lead-in to inner run-out. */
+  function albumProgress(i: number) {
+    const list = tracksOf(i);
+    if (!list.length) return 0;
+    const curSide = sideOf(i, trackIndex);
+    let total = 0;
+    let before = 0;
+    for (let k = 0; k < list.length; k++) {
+      if (sideOf(i, k) !== curSide) continue;
+      const d = list[k].duration || 240;
+      if (k < trackIndex) before += d;
+      total += d;
+    }
+    const cur = audioRecord === i && Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    return total > 0 ? clamp01((before + cur) / total) : 0;
+  }
+
+  /** The tonearm angle for the current point on the record. */
+  function grooveYaw(i: number) {
+    return lerp(turntable.armPlay, turntable.armEnd, albumProgress(i));
+  }
+
+  function primeAudio(i: number) {
+    const list = tracksOf(i);
+    if (!list.length || (needleDown && audioRecord >= 0)) return;
+    if (audioRecord !== i) {
+      trackIndex = 0;
+      audio.src = list[0].url;
+      audio.currentTime = 0;
+      audioRecord = i;
+    }
+    preloadNext(i, trackIndex);
+    audio.muted = true;
+    playPromise = audio.play().then(
+      () => {
+        playPromise = undefined;
+        if (!needleDown || held !== i) {
+          audio.pause();
+          if (held !== i || !playing) audio.currentTime = 0;
+          audio.muted = false;
+        } else {
+          audio.muted = false;
+        }
+      },
+      () => {
+        playPromise = undefined;
+        audio.muted = false;
+      },
+    );
+  }
+
+  function startAudio(i: number) {
+    const list = tracksOf(i);
+    if (!list.length) return;
+    if (audioRecord !== i || trackIndex >= list.length) {
+      trackIndex = 0;
+      audio.src = list[0].url;
+      audio.currentTime = 0;
+      audioRecord = i;
+    } else if (audio.ended) {
+      audio.currentTime = 0;
+    }
+    preloadNext(i, trackIndex);
+    refreshTip();
+    audio.muted = false;
+    if (!playPromise && audio.paused) {
+      playPromise = audio.play().then(
+        () => {
+          playPromise = undefined;
+          if (!needleDown || held !== i) audio.pause();
+        },
+        () => {
+          playPromise = undefined;
+        },
+      );
+    }
+  }
+
+  function stopAudio() {
+    if (playPromise) audio.muted = true;
+    else audio.pause();
+  }
+
+  audio.addEventListener('ended', () => {
+    if (!playing || !needleDown || held < 0) return;
+    const list = tracksOf(held);
+    if (trackIndex + 1 < list.length) {
+      if (sideOf(held, trackIndex + 1) !== discSide) {
+        trackIndex++;
+        needleDown = false;
+        audio.src = list[trackIndex].url;
+        audio.currentTime = 0;
+        preloadNext(held, trackIndex);
+        refreshTip();
+        void act(async () => {
+          await flipRecord(sideOf(held, trackIndex));
+          await startPlayback();
+        });
+      } else {
+        trackIndex++;
+        audio.src = list[trackIndex].url;
+        audio.currentTime = 0;
+        preloadNext(held, trackIndex);
+        refreshTip();
+        playPromise = audio.play().then(
+          () => {
+            playPromise = undefined;
+            if (!needleDown) audio.pause();
+          },
+          () => {
+            playPromise = undefined;
+          },
+        );
+      }
+    } else {
+      trackIndex = 0;
+      void act(() => stopPlayback());
+    }
+  });
 
   interface Tween {
     t: number;
@@ -1981,7 +2162,7 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   function hoverStep(e: number) {
     const m = 1 - outCubic(e);
     disc.p.copy(hoverAt).addScaledVector(MISALIGN, m);
-    disc.q.identity();
+    disc.q.setFromEuler(eu.set(discFlip, 0, 0));
     touch();
   }
 
@@ -1989,7 +2170,7 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   function dropStep(e: number) {
     const k = 0.5 * smooth(e) + 0.5 * e;
     disc.p.lerpVectors(hoverAt, SEAT, k);
-    disc.q.identity();
+    disc.q.setFromEuler(eu.set(discFlip, 0, 0));
     touch();
   }
 
@@ -2005,7 +2186,7 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     // The rim never dips into the mat as the record rocks.
     disc.p.copy(SEAT);
     disc.p.y += bounce + Math.max(Math.abs(rx), Math.abs(rz)) * 0.152 * 0.9;
-    disc.q.setFromEuler(eu.set(rx, 0, rz));
+    disc.q.setFromEuler(eu.set(discFlip + rx, 0, rz));
     touch();
   }
 
@@ -2015,6 +2196,8 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     turntable.setLabel(covers[i]);
     turntable.spin.visible = true;
     held = i;
+    discSide = 'A';
+    discFlip = 0;
     spinAngle = 0;
     spinSpeed = 0;
     refreshTip();
@@ -2029,16 +2212,33 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   async function removeRecord(i: number) {
     const a0 = spinAngle;
     const a1 = Math.round(a0 / TAU) * TAU;
+    const flip0 = discFlip;
     await tween(0.34, (e) => dropStep(1 - e));
     await tween(0.2, (e) => hoverStep(1 - e));
+    if (discFlip !== 0) {
+      discSide = 'A';
+      discFlip = 0;
+    }
     // The label comes round to upright on the way, so it enters its sleeve square.
     await Promise.all([
-      tween(0.95, (e) => carryStep(i, 1 - e, true)),
+      tween(0.95, (e) => {
+        carryStep(i, 1 - e, true);
+        if (flip0 !== 0) {
+          const qFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), lerp(flip0, 0, smooth(e)));
+          disc.q.multiply(qFlip);
+        }
+      }),
       tween(0.95, (e) => (spinAngle = lerp(a0, a1, smooth(e)))),
     ]);
     await tween(0.45, (e) => slideStep(i, 1 - e));
     nudge(i, 0);
     turntable.spin.visible = false;
+    if (audioRecord === i) {
+      trackIndex = 0;
+      const first = tracksOf(i)[0];
+      if (first && audio.src !== first.url) audio.src = first.url;
+      audio.currentTime = 0;
+    }
     held = -1;
     refreshTip();
   }
@@ -2062,15 +2262,58 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   const spinUp = (e: number) => e * e; // slow, then faster, as the motor takes the platter
   const spinDown = (e: number) => 1 - Math.exp(-4.2 * e) * (1 - e); // a natural coast to a stop
 
+  async function flipRecord(toSide: 'A' | 'B') {
+    if (discSide === toSide) return;
+    if (armYaw !== 0 || needleDown || spinSpeed > 0) {
+      needleDown = false;
+      stopAudio();
+      await armTo(armYaw, ARM_UP, 0.24, outCubic);
+      const braking = spinTo(0, 1.1, spinDown);
+      await armTo(0, ARM_UP, 0.7, inOut);
+      await armTo(0, 0, 0.25, outQuad);
+      await braking;
+    }
+    const fromFlip = discFlip;
+    const toFlip = toSide === 'B' ? Math.PI : 0;
+    await tween(0.32, (e) => {
+      const k = smooth(e);
+      disc.p.lerpVectors(SEAT, hoverAt, k);
+      disc.q.setFromEuler(eu.set(fromFlip, 0, 0));
+      touch();
+    });
+    await tween(0.78, (e) => {
+      const k = smoother(e);
+      const bell = Math.sin(Math.PI * k);
+      disc.p.copy(hoverAt);
+      disc.p.y += 0.095 * bell;
+      disc.p.z += 0.025 * bell;
+      eu.set(lerp(fromFlip, toFlip, k), 0.12 * bell, 0.08 * Math.sin(TAU * k));
+      disc.q.setFromEuler(eu);
+      touch();
+    });
+    discSide = toSide;
+    discFlip = toFlip;
+    refreshTip();
+    await tween(0.35, dropStep);
+    await tween(SETTLE, settleStep);
+  }
+
   /** Spin-up and needle drop. `playGate` is what to wait for first (e.g. music starting). */
   async function startPlayback() {
     playing = true;
+    if (audioRecord !== held) trackIndex = 0;
     refreshTip();
     await playGate();
+    if (held >= 0 && sideOf(held, trackIndex) !== discSide) {
+      await flipRecord(sideOf(held, trackIndex));
+    }
+    const targetYaw = audioRecord === held ? grooveYaw(held) : turntable.armPlay;
     const turning = spinTo(1, 1.05, spinUp);
     await armTo(0, ARM_UP, 0.16, outQuad); // lifts a little off its rest
-    await armTo(turntable.armPlay, ARM_UP, 0.7, inOut); // over the lead-in groove
-    await armTo(turntable.armPlay, ARM_DOWN, 0.85, outCubic); // lowered like a cue lever
+    await armTo(targetYaw, ARM_UP, 0.7, inOut); // over the groove
+    await armTo(targetYaw, ARM_DOWN, 0.85, outCubic); // lowered like a cue lever
+    needleDown = true;
+    startAudio(held);
     // ...and a tiny settle in the groove.
     await tween(0.22, (e) => {
       armLift = ARM_DOWN + 0.0006 * Math.exp(-9 * e) * Math.sin(Math.PI * 3 * e) * (1 - e);
@@ -2080,6 +2323,8 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   }
   async function stopPlayback() {
     playing = false;
+    needleDown = false;
+    stopAudio();
     refreshTip();
     await armTo(armYaw, ARM_UP, 0.28, outCubic);
     const braking = spinTo(0, 1.5, spinDown);
@@ -2116,7 +2361,56 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   }
   function toggleTurntable() {
     if (held < 0) return;
+    if (!playing) primeAudio(held);
     void act(() => (playing ? stopPlayback() : startPlayback()));
+  }
+
+  /** Lift the stylus, swing to the current track's groove radius, and lower it back down. */
+  async function cueCurrentTrack() {
+    if (held < 0 || !playing) return;
+    if (held >= 0 && sideOf(held, trackIndex) !== discSide) {
+      await flipRecord(sideOf(held, trackIndex));
+      await startPlayback();
+      return;
+    }
+    needleDown = false;
+    stopAudio();
+    refreshTip();
+    if (armLift < ARM_UP * 0.9) {
+      await armTo(armYaw, ARM_UP, 0.2, outQuad);
+    }
+    await armTo(grooveYaw(held), ARM_UP, 0.4, inOut);
+    if (Math.abs(armYaw - grooveYaw(held)) > 0.002) {
+      await armTo(grooveYaw(held), ARM_UP, 0.25, inOut);
+    }
+    await armTo(grooveYaw(held), ARM_DOWN, 0.45, outCubic);
+    needleDown = true;
+    startAudio(held);
+    await tween(0.18, (e) => {
+      armLift = ARM_DOWN + 0.0005 * Math.exp(-9 * e) * Math.sin(Math.PI * 3 * e) * (1 - e);
+      touch();
+    });
+  }
+
+  function skipTrack(delta: number) {
+    if (held < 0) return;
+    const list = tracksOf(held);
+    if (!list.length) return;
+    if (audioRecord !== held) {
+      audioRecord = held;
+      trackIndex = 0;
+    }
+    const next = Math.min(list.length - 1, Math.max(0, trackIndex + delta));
+    if (next === trackIndex) return;
+    trackIndex = next;
+    needleDown = false;
+    stopAudio();
+    audio.src = list[trackIndex].url;
+    audio.currentTime = 0;
+    preloadNext(held, trackIndex);
+    primeAudio(held);
+    refreshTip();
+    void act(() => (playing ? cueCurrentTrack() : startPlayback()));
   }
 
   /** Lab only: freeze the put-a-record-on sequence `sec` seconds in (no timers), and report the pose. */
@@ -2125,6 +2419,8 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     turntable.setLabel(covers[i]);
     turntable.spin.visible = true;
     held = i;
+    discSide = 'A';
+    discFlip = 0;
     spinAngle = 0;
     spinSpeed = 0;
     armYaw = 0;
@@ -2161,21 +2457,9 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     if (h.key === 'turntable' && held >= 0) return playing ? 'Click to stop' : 'Click to play';
     return undefined;
   }
-  function refreshTip() {
-    const was = tipFor;
-    tipFor = undefined;
-    showTip(was);
-    now.classList.toggle('is-on', playing && held >= 0);
-    if (held >= 0 && recordInfo[held]) {
-      nowTitle.textContent = recordInfo[held].title;
-      nowArtist.textContent = recordInfo[held].artist;
-      nowLink.href = recordInfo[held].url;
-    }
-  }
-
-  // The caption under the room: what is on the turntable, a way to the album,
-  // and a way to stop. Hidden from assistive tech with the rest of the stage
-  // (the lists below carry the real links).
+  // The caption under the room: what is on the turntable, track skip controls,
+  // a way to the album, and a way to stop. Hidden from assistive tech with the
+  // rest of the stage (the lists below carry the real links).
   const now = document.createElement('div');
   now.className = 'room-now';
   const nowText = document.createElement('div');
@@ -2185,16 +2469,82 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   const nowTitle = document.createElement('strong');
   const nowArtist = document.createElement('span');
   nowText.append(nowLabel, nowTitle, nowArtist);
-  const nowLink = document.createElement('a');
-  nowLink.tabIndex = -1;
-  nowLink.textContent = 'Listen on Spotify';
+  const nowActions = document.createElement('div');
+  nowActions.className = 'room-now-actions';
+  const nowPrev = document.createElement('button');
+  nowPrev.type = 'button';
+  nowPrev.tabIndex = -1;
+  nowPrev.textContent = 'Prev';
+  nowPrev.addEventListener('click', () => skipTrack(-1));
+  const nowNext = document.createElement('button');
+  nowNext.type = 'button';
+  nowNext.tabIndex = -1;
+  nowNext.textContent = 'Next';
+  nowNext.addEventListener('click', () => skipTrack(1));
   const nowStop = document.createElement('button');
   nowStop.type = 'button';
   nowStop.tabIndex = -1;
   nowStop.textContent = 'Stop';
   nowStop.addEventListener('click', () => toggleTurntable());
-  now.append(nowText, nowLink, nowStop);
+  const nowLink = document.createElement('a');
+  nowLink.tabIndex = -1;
+  nowLink.textContent = 'Listen on Spotify';
+  nowActions.append(nowPrev, nowNext, nowStop, nowLink);
+  now.append(nowText, nowActions);
   stage.append(now);
+
+  function fmtTime(sec: number): string {
+    if (!Number.isFinite(sec) || sec < 0) sec = 0;
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  }
+
+  function updateNowTime() {
+    if (!playing || held < 0 || !recordInfo[held]) return;
+    const r = recordInfo[held];
+    const list = r.tracks ?? [];
+    const idx = audioRecord === held ? trackIndex : 0;
+    const track = list[idx]?.title;
+    if (!track) return;
+    const cur = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (list[idx]?.duration ?? 0);
+    nowArtist.textContent = `${r.title} — ${r.artist} · ${idx + 1}/${list.length} · ${fmtTime(cur)} / ${fmtTime(dur)}`;
+  }
+
+  audio.addEventListener('timeupdate', updateNowTime);
+  audio.addEventListener('loadedmetadata', updateNowTime);
+
+  function refreshTip() {
+    const was = tipFor;
+    tipFor = undefined;
+    showTip(was);
+    now.classList.toggle('is-on', held >= 0 && (playing || discSide === 'B' || trackIndex > 0));
+    if (held >= 0 && recordInfo[held]) {
+      const r = recordInfo[held];
+      const list = r.tracks ?? [];
+      const idx = audioRecord === held ? trackIndex : 0;
+      const track = list[idx]?.title;
+      const side = sideOf(held, idx);
+      nowLabel.textContent = playing ? `Now playing · Side ${side}` : `On the turntable · Side ${side}`;
+      nowTitle.textContent = track ? sideTrackLabel(held, idx) : r.title;
+      if (track) {
+        if (playing) {
+          updateNowTime();
+        } else {
+          nowArtist.textContent = `${r.title} — ${r.artist} (${idx + 1}/${list.length})`;
+        }
+      } else {
+        nowArtist.textContent = r.artist;
+      }
+      nowLink.href = r.url;
+      nowPrev.hidden = list.length <= 1;
+      nowNext.hidden = list.length <= 1;
+      nowPrev.disabled = idx <= 0;
+      nowNext.disabled = idx >= list.length - 1;
+      nowStop.textContent = playing ? 'Stop' : 'Play';
+    }
+  }
 
   // Hotspots: a small ember dot on each thing that can be hovered, until the
   // visitor has hovered one (then they know, and the dots go for good).
@@ -2336,10 +2686,12 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
         tw.done();
       }
     }
-    // The platter turns at 33 1/3 times its speed.
+    // The platter turns at 33 1/3 times its speed, and while the stylus is in
+    // the groove the tonearm tracks slowly inward from the rim to the label.
     if (!options.reducedMotion) spinAngle += dt * RPM * spinSpeed;
+    if (needleDown && held >= 0) armYaw = grooveYaw(held);
     turntable.spin.position.copy(disc.p);
-    turntable.spin.quaternion.copy(disc.q).multiply(qSpin.setFromAxisAngle(Y_AXIS, -spinAngle));
+    turntable.spin.quaternion.copy(disc.q).multiply(qSpin.setFromAxisAngle(Y_AXIS, (discSide === 'B' ? 1 : -1) * spinAngle));
     turntable.arm.rotation.y = armYaw;
     turntable.arm.position.y = armHomeY + armLift;
 
@@ -2374,6 +2726,7 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     if (!h) return;
     if (h.record !== undefined) {
       const i = h.record;
+      if (held !== i || !playing) primeAudio(i);
       void act(() => choose(i));
     } else if (h.key === 'turntable') toggleTurntable();
   });
@@ -2401,6 +2754,14 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     now.remove();
     dots.remove();
     tweens.clear();
+    needleDown = false;
+    audio.removeEventListener('timeupdate', updateNowTime);
+    audio.removeEventListener('loadedmetadata', updateNowTime);
+    audio.pause();
+    audio.removeAttribute('src');
+    audio.load();
+    nextAudio.removeAttribute('src');
+    nextAudio.load();
     moteGeo.dispose();
     moteMat.dispose();
     stage.style.cursor = '';
@@ -2412,6 +2773,7 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   const api = {
     play: (i: number) => act(() => choose(i)),
     stop: () => act(async () => void (playing && (await stopPlayback()))),
+    flip: (toSide?: 'A' | 'B') => act(() => flipRecord(toSide ?? (discSide === 'A' ? 'B' : 'A'))),
     /** For playing the record only once something else is ready (e.g. a music player has started). */
     setPlayGate: (gate: () => Promise<unknown>) => void (playGate = gate),
     /** Lab only: freeze the sequence for a record `sec` seconds in. */

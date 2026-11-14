@@ -21,8 +21,20 @@ import record2 from '../assets/record-2.jpg';
 import record3 from '../assets/record-3.jpg';
 import record4 from '../assets/record-4.jpg';
 import { music } from '../data/site';
+const audioById = Object.fromEntries(
+  Object.entries(import.meta.glob<string>('../assets/*.mp3', { eager: true, query: '?url', import: 'default' })).map(
+    ([path, url]) => [path.replace(/^.*\/|\.mp3$/g, ''), url],
+  ),
+);
 const covers = JSON.stringify([record1, record2, record3, record4].map((r) => r.src));
-const records = JSON.stringify(music.records.map(({ title, artist, url }) => ({ title, artist, url })));
+const records = JSON.stringify(
+  music.records.map(({ id, title, artist, tracks, audio, url }) => ({
+    title,
+    artist,
+    tracks: tracks ?? (audio ?? audioById[id] ? [{ title, url: (audio ?? audioById[id])!, duration: 240 }] : undefined),
+    url,
+  })),
+);
 const gear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, text }) => [id, { title, text }])));
 ---
 

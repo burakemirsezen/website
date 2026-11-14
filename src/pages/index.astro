@@ -63,8 +63,22 @@ const coreFacts = ['Compute', 'Deploys', 'Workloads', 'Secrets'];
 // Photos, keyed by id: `portrait` for the hero, and the ids in `music`
 // (src/data/site.ts) for the music section. Missing ones show a dashed slot.
 // Example: import guitar from "../assets/guitar.jpg"; then add `guitar` here.
+// Audio for the turntable: put `record-1.mp3` .. `record-4.mp3` in src/assets
+// (or set `audio` on the record in src/data/site.ts).
+const audioById = Object.fromEntries(
+  Object.entries(import.meta.glob<string>('../assets/*.mp3', { eager: true, query: '?url', import: 'default' })).map(
+    ([path, url]) => [path.replace(/^.*\/|\.mp3$/g, ''), url],
+  ),
+);
 // Labels for the WebGL room's hover notes, from the same data as the lists.
-const roomRecords = JSON.stringify(music.records.map(({ title, artist, url }) => ({ title, artist, url })));
+const roomRecords = JSON.stringify(
+  music.records.map(({ id, title, artist, tracks, audio, url }) => ({
+    title,
+    artist,
+    tracks: tracks ?? (audio ?? audioById[id] ? [{ title, url: (audio ?? audioById[id])!, duration: 240 }] : undefined),
+    url,
+  })),
+);
 const roomGear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, text }) => [id, { title, text }])));
 
 // Structured data for search engines (schema.org ProfilePage with a Person),

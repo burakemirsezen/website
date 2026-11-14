@@ -30,9 +30,16 @@
   pointer-events: auto;
 }
 
-.room-now > div {
+.room-now > div:first-child {
   display: grid;
   gap: 0.05rem;
+}
+
+.room-now-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.9rem;
 }
 
 .room-now-label {
@@ -40,9 +47,8 @@
   align-items: center;
   gap: 0.45rem;
   color: var(--muted);
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.875rem;
+  font-weight: 650;
 }
 
 .room-now-label::before {
@@ -54,12 +60,14 @@
 }
 
 .room-now strong {
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .room-now div > span:last-child {
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .room-now a,
@@ -76,8 +84,15 @@
 }
 
 .room-now a:hover,
-.room-now button:hover {
+.room-now button:hover:not(:disabled) {
   text-decoration-thickness: 2px;
+}
+
+.room-now button:disabled {
+  color: var(--muted);
+  text-decoration: none;
+  opacity: 0.45;
+  cursor: default;
 }
 
 @media (prefers-reduced-motion: no-preference) {

@@ -155,8 +155,10 @@ export interface Turntable {
   spin: THREE.Object3D;
   /** The tonearm, pivoting about y at its base; rest is rotation 0, y 0. */
   arm: THREE.Object3D;
-  /** The arm's rotation.y that puts the stylus over the groove. */
+  /** The arm's rotation.y that puts the stylus over the outer lead-in groove. */
   armPlay: number;
+  /** The arm's rotation.y at the inner run-out groove near the label. */
+  armEnd: number;
   /** Changes the label on the record. */
   setLabel(tex: THREE.Texture): void;
 }
@@ -401,7 +403,7 @@ export function buildTurntable(cover: THREE.Texture): Turntable {
       clearcoatRoughness: 0.35,
     });
     const edgeMat = std(0x0c0c0c, 0.45);
-    const record = mesh(new THREE.CylinderGeometry(REC_R, REC_R, recH, 160, 1), [edgeMat, vinylMat, edgeMat]);
+    const record = mesh(new THREE.CylinderGeometry(REC_R, REC_R, recH, 160, 1), [edgeMat, vinylMat, vinylMat]);
     record.position.y = recH / 2;
     spin.add(record);
     labelMat = new THREE.MeshStandardMaterial({ map: cover, roughness: 0.55 });
@@ -412,6 +414,10 @@ export function buildTurntable(cover: THREE.Texture): Turntable {
     label.rotation.x = -Math.PI / 2;
     label.position.y = recH + 0.0002;
     spin.add(label);
+    const labelBottom = mesh(new THREE.RingGeometry(HOLE, LABEL_R, 72), labelMat);
+    labelBottom.rotation.x = Math.PI / 2;
+    labelBottom.position.y = -0.0002;
+    spin.add(labelBottom);
     const holeMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
     const holeTop = mesh(new THREE.CircleGeometry(HOLE + 0.0003, 20), holeMat, false);
     holeTop.rotation.x = -Math.PI / 2;
@@ -441,6 +447,7 @@ export function buildTurntable(cover: THREE.Texture): Turntable {
   // silver nameplate, silver finger lift.
   const arm = new THREE.Group();
   let armPlay = 0;
+  let armEnd = 0;
   {
     const ARM_Y = TOP + 0.033;
     const pivot = new THREE.Vector3(0.128, ARM_Y, -0.108);
@@ -544,21 +551,24 @@ export function buildTurntable(cover: THREE.Texture): Turntable {
     }
     armAdd(head);
 
-    // Where the stylus lands: swing the arm in until it is over the record,
-    // a third of the way from the rim to the label.
+    // Where the stylus lands: swing the arm in from the outer lead-in groove
+    // (armPlay) across the grooved band to the inner run-out groove (armEnd).
     {
       const stylus = new THREE.Vector2(
         tip.x + Math.sin(head.rotation.y) * 0.034 - pivot.x,
         tip.z + Math.cos(head.rotation.y) * 0.034 - pivot.z,
       );
-      const goal = LABEL_R + (REC_R - LABEL_R) * 0.62;
+      const outer = 0.145;
+      const inner = 0.062;
       for (let a = 0; a > -1.2; a -= 0.002) {
         const c = Math.cos(a);
         const s = Math.sin(a);
         const x = pivot.x + stylus.x * c + stylus.y * s;
         const z = pivot.z - stylus.x * s + stylus.y * c;
-        armPlay = a;
-        if (Math.hypot(x - PX, z - PZ) < goal) break;
+        const d = Math.hypot(x - PX, z - PZ);
+        if (d >= outer) armPlay = a;
+        armEnd = a;
+        if (d < inner) break;
       }
     }
 
@@ -684,5 +694,5 @@ export function buildTurntable(cover: THREE.Texture): Turntable {
     g.add(lid);
   }
 
-  return { group: g, spin, arm, armPlay, setLabel: (tex) => ((labelMat.map = tex), (labelMat.needsUpdate = true)) };
+  return { group: g, spin, arm, armPlay, armEnd, setLabel: (tex) => ((labelMat.map = tex), (labelMat.needsUpdate = true)) };
 }
