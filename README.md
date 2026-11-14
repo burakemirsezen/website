@@ -59,6 +59,33 @@ becomes a link to that commit.
 - The cluster section names the stack but no hostnames or addresses. Keep it
   that way.
 
+## The listening room's baked lighting
+
+The 3D room has ambient occlusion (contact shadows, darker corners) that is
+computed once, offline, and only sampled at runtime. It is mood independent, so
+one bake serves day and night. The files are in `src/assets/bake/` (about
+0.6 MB): an atlas for the large flat faces (floor, walls, ceiling, rug) and one
+byte per vertex for everything else. If they are missing, or a model no longer
+matches them, the room simply looks as it did without them (the browser console
+says once that a re-bake is due).
+
+Re-bake after changing any model or its placement in `src/scripts/room/`:
+
+```
+npm run bake                  # needs Chrome or Edge and a real GPU; about a minute
+git add src/assets/bake
+```
+
+`npm run bake` starts its own dev server on port 4329, runs `/bake` in headless
+Chrome on the GPU, writes the files and stops again. It refuses to run on a
+software renderer unless you pass `--allow-software`. Options:
+`-- --spp 1024` (rays per sample, default 512), `--density 160` (atlas texels
+per metre), `--dist 0.9` (occluder reach in metres), `--strength 1.4`,
+`--min 0.3` (AO never darker than this). To use a visible browser instead,
+run `npm run dev`, open `http://localhost:4321/bake` and press Bake.
+`/lab/?model=room&bake=1` shows the room with the bake applied. The bake page
+and its code are removed from the production build.
+
 ## Release and deploy
 
 `.github/workflows/image.yaml` builds the image on every push. Pushing a tag

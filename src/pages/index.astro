@@ -4,6 +4,8 @@ import '@fontsource-variable/public-sans';
 // the hero is the largest thing painted on desktop and waits for this font.
 import publicSansLatin from '@fontsource-variable/public-sans/files/public-sans-latin-wght-normal.woff2?url';
 import '../styles/global.css';
+import '../styles/room.css';
+import '../styles/cluster.css';
 import { execSync } from 'node:child_process';
 import { Image } from 'astro:assets';
 import csShot from '../assets/community-solutions.png';
@@ -324,6 +326,49 @@ const photos: Record<string, ImageMetadata | undefined> = {
             </div>
           </div>
 
+          <!-- Filled in by the script from the pod that served this page; stays hidden if it cannot be reached. -->
+          <div class="live-panel" data-live-panel hidden>
+            <div class="live-head">
+              <span class="live-dot" aria-hidden="true"></span>
+              <h3>Live from the pod that served you</h3>
+            </div>
+            <dl>
+              <div class="live-cell pod" data-live-cell>
+                <dt>Pod</dt>
+                <dd data-live="pod">-</dd>
+              </div>
+              <div class="live-cell" data-live-cell hidden>
+                <dt>Requests served</dt>
+                <dd data-live="served">-</dd>
+                <small>by this pod since it started, yours included</small>
+              </div>
+              <div class="live-cell" data-live-cell hidden>
+                <dt>Open connections</dt>
+                <dd data-live="conns">-</dd>
+                <small>to this pod right now</small>
+              </div>
+              <div class="live-cell" data-live-cell hidden>
+                <dt>Cloudflare edge</dt>
+                <dd data-live="edge">-</dd>
+                <small>the data centre you reached</small>
+              </div>
+            </dl>
+            <div class="live-rtt">
+              <svg class="live-spark" data-live-spark viewBox="0 0 160 40" role="img" aria-label="Round trip times of the last checks, newest on the right">
+                <line x1="0" y1="37" x2="160" y2="37"></line>
+                <polyline points=""></polyline>
+                <circle r="3.5" cx="-10" cy="-10"></circle>
+              </svg>
+              <dl>
+                <div class="live-cell" data-live-cell>
+                  <dt>Round trip, you to the pod and back</dt>
+                  <dd data-live="rtt">-</dd>
+                  <small data-live="rtt-median">first checks</small>
+                </div>
+              </dl>
+            </div>
+          </div>
+
           <dl class="facts">
             {
               cluster.facts
@@ -431,7 +476,7 @@ const photos: Record<string, ImageMetadata | undefined> = {
           <div class="room-stage" aria-hidden="true" data-records={roomRecords} data-gear={roomGear}>
             <div class="room-loader"></div>
           </div>
-          <p class="room-hint">Hover over things for details. Records open on Spotify.</p>
+          <p class="room-hint">Hover over things for details. Click a record to put it on.</p>
 
           <div class="music-list">
             <h3 class="sub">{music.recordsTitle}</h3>
@@ -509,6 +554,7 @@ const photos: Record<string, ImageMetadata | undefined> = {
           <li><a href={person.github} rel="me">GitHub</a></li>
           <li><a href={person.linkedin} rel="me">LinkedIn</a></li>
         </ul>
+        <div class="foot-end">
         <p class="foot-build">
           {sha ? (
             <>
@@ -519,10 +565,15 @@ const photos: Record<string, ImageMetadata | undefined> = {
             <>This version: local build, {builtOn}.</>
           )}
         </p>
+        <a class="foot-top" href="#">Back to top</a>
+        </div>
       </div>
     </footer>
 
     <script>
+      import { initClusterLive } from '../scripts/cluster-live';
+      import '../scripts/fx';
+
       // Marks the nav link of the section in view. A section counts as in
       // view while it crosses a thin band a third of the way down the window.
       const links = new Map(
@@ -549,51 +600,8 @@ const photos: Record<string, ImageMetadata | undefined> = {
         if (section) observer.observe(section);
       }
 
-      // Live trace in the cluster section. Cloudflare answers /cdn-cgi/trace
-      // on every proxied site with the edge location ("colo=ZRH"); the browser
-      // knows when the first byte of this page arrived. Both are real, so both
-      // are optional: without them the path keeps its plain labels.
-      const meta = document.querySelector<HTMLElement>('[data-trace-meta]');
-      const edge = document.querySelector<HTMLElement>('[data-hop="Cloudflare"]');
-      const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-      const firstByte = nav && nav.responseStart > 0 ? Math.round(nav.responseStart) : undefined;
-      if (meta && firstByte) {
-        meta.textContent = `This visit: first byte after ${firstByte} ms.`;
-        meta.hidden = false;
-      }
-      fetch('/cdn-cgi/trace')
-        .then((r) => (r.ok ? r.text() : ''))
-        .then((text) => {
-          const colo = /^colo=([A-Z]{3})$/m.exec(text)?.[1];
-          if (edge && colo) edge.textContent = `Cloudflare ${colo}`;
-        })
-        .catch(() => {});
-
-      // "built 3 hours ago": the build time is baked in; the age is worked
-      // out here, so the line stays true without a rebuild.
-      const built = document.querySelector<HTMLTimeElement>('[data-built-ago]');
-      if (built) {
-        const minutes = (Date.now() - Date.parse(built.dateTime)) / 60000;
-        const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-        const [value, unit]: [number, Intl.RelativeTimeFormatUnit] =
-          minutes < 60 ? [Math.round(minutes), 'minute'] : minutes < 1440 ? [Math.round(minutes / 60), 'hour'] : [Math.round(minutes / 1440), 'day'];
-        if (minutes >= 0) built.textContent = rtf.format(-Math.max(value, 1), unit);
-      }
-
-      // The live path lights up hop by hop the first time it scrolls into view.
-      const live = document.querySelector('.chain.live');
-      if (live) {
-        live.classList.add('dim');
-        new IntersectionObserver(
-          (entries, obs) => {
-            if (entries.some((e) => e.isIntersecting)) {
-              live.classList.replace('dim', 'lit');
-              obs.disconnect();
-            }
-          },
-          { threshold: 0.6 },
-        ).observe(live);
-      }
+      // Live trace and pod details in the cluster section.
+      initClusterLive();
 
       // On desktop, the listening room: a WebGL scene, fetched only when the
       // section comes within a screen of view, so the top of the page never

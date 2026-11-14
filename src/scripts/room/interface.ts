@@ -8,7 +8,7 @@
 // silver MONITOR knob, then DIRECT MONITOR over the headphone socket.
 // The Focusrite logo is etched into the top.
 
-import { THREE, std, mesh, canvasTexture, RoundedBoxGeometry } from './kit';
+import { THREE, std, mesh, canvasTexture, RoundedBoxGeometry, brushedParams } from './kit';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 type V3 = [number, number, number];
@@ -160,10 +160,13 @@ export function buildInterface(): THREE.Group {
 
   const red = new THREE.MeshPhysicalMaterial({
     color: 0xc4111c,
-    roughness: 0.34,
+    // Anodised aluminium, finely brushed along the case: the extrusion's UVs
+    // are in metres, so the tile repeats about once a centimetre.
+    ...brushedParams(90, 90, 0.3, 0.42),
     metalness: 0.3,
     clearcoat: 0.3,
     clearcoatRoughness: 0.35,
+    anisotropy: 0.35,
   });
   const panelMat = std(0x141516, 0.38, 0.25);
   const black = std(0x0d0d0d, 0.5, 0.1);
@@ -432,7 +435,9 @@ export function buildInterface(): THREE.Group {
   {
     const halo = (p: { x: number; y: number }, color: number, glow: number) => {
       const m = new THREE.MeshStandardMaterial({ color, emissive: glow, emissiveIntensity: 0.8, roughness: 0.3 });
-      g.add(mesh(place(new THREE.RingGeometry(0.0055, 0.0068, 48), [p.x, p.y, FZ + 0.0003]), m, false));
+      const ring = mesh(place(new THREE.RingGeometry(0.0055, 0.0068, 48), [p.x, p.y, FZ + 0.0003]), m, false);
+      ring.name = glow === 0x10c03a ? 'led-signal' : 'led-clip';
+      g.add(ring);
       g.add(mesh(place(new THREE.RingGeometry(0.0051, 0.0072, 48), [p.x, p.y, FZ + 0.0002]), std(0x080808, 0.3), false));
     };
     halo(P.gain1, 0x0a7a25, 0x10c03a);

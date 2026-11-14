@@ -7,15 +7,17 @@
 // Units are metres. The room is 3.6 wide, 2.7 tall and 3.6 deep; x = 0 is
 // the middle, z = 1.8 the open front, z = -1.8 the back wall, y = 0 the
 // floor. Daylight comes through a deep-set window in the left wall; at night
-// (dark mode) the floor lamp in the right corner does the work.
+// (dark mode) the floor lamp in the right corner does the work. By day the
+// sky and the sun follow the real time in Zurich.
 
-import { THREE, C, std, mesh, box, cyl, canvasTexture, grainTexture, RoundedBoxGeometry } from './kit';
+import { THREE, C, std, mesh, box, cyl, canvasTexture, grainTexture, RoundedBoxGeometry, normalTexture, normalFromHeight, greyCanvas, dataTexture, roughTexture, woodParams, weaveHeight, setMaxAnisotropy } from './kit';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildGuitar } from './guitar';
 import { buildAmp } from './amp';
 import { buildInterface } from './interface';
 import { buildTurntable } from './turntable';
 import { buildSpeaker } from './speakers';
+import { applyBake } from './lightbake';
 
 export interface RoomRecord {
   title: string;
@@ -37,6 +39,8 @@ export interface RoomOptions {
   records?: RoomRecord[];
   /** Hover labels for the gear, keyed guitar, amp, interface, turntable, speakers. */
   gear?: Record<string, RoomGear>;
+  /** Hour of the day (0-24) to light the room for; by default the time in Zurich now. */
+  hour?: number;
   /** Called once, after the first frame is on the canvas. */
   onReady?: () => void;
 }
@@ -68,37 +72,60 @@ function hash(a: number, b = 0) {
 // --------------------------------------------------------------- Textures
 
 // Oak parquet in herringbone (Fischgrat), the floor of most old Zurich flats.
-// One canvas covers the whole floor, so nothing repeats.
-function parquetTexture() {
+// One canvas covers the whole floor, so nothing repeats. Three maps from one
+// plank layout: colour (2048), a height-derived normal map with bevelled
+// gaps (1024) and a roughness map with varnish wear (512).
+function parquetMaps() {
   const pw = 2048;
   const ph = Math.round((pw * D) / W);
-  const t = canvasTexture(pw, ph, (g) => {
+  // Walks the herringbone for a canvas of the given width, calling `plank`
+  // for each board in a frame rotated 45 degrees about the canvas centre.
+  const layout = (g: CanvasRenderingContext2D, w: number, h: number, plank: (x: number, y: number, w: number, h: number, i: number, j: number, along: boolean) => void) => {
+    const c = 0.072 * (w / W); // plank width in pixels
+    const n = 6; // plank length in widths
+    g.save();
+    g.translate(w / 2, h / 2);
+    g.rotate(Math.PI / 4);
+    const reach = Math.ceil(Math.hypot(w, h) / c / 2) + n * 2;
+    for (let i = -reach; i <= reach; i++) {
+      for (let j = -reach; j <= reach; j++) {
+        const m = (((i - j) % (2 * n)) + 2 * n) % (2 * n);
+        if (m === 0) plank(i * c, j * c, n * c, c, i, j, true);
+        else if (m === 2 * n - 1) plank(i * c, j * c, c, n * c, i, j, false);
+      }
+    }
+    g.restore();
+  };
+  const map = canvasTexture(pw, ph, (g) => {
     g.fillStyle = '#6b4a2e';
     g.fillRect(0, 0, pw, ph);
-    const ppm = pw / W;
-    const c = 0.072 * ppm; // plank width in pixels
-    const n = 6; // plank length in widths
-    g.translate(pw / 2, ph / 2);
-    g.rotate(Math.PI / 4);
-    const reach = Math.ceil(Math.hypot(pw, ph) / c / 2) + n * 2;
-    const plank = (x: number, y: number, w: number, h: number, i: number, j: number, along: boolean) => {
+    layout(g, pw, ph, (x, y, w, h, i, j, along) => {
       const r = hash(i, j);
       const l = 50 + r * 11;
       g.fillStyle = `hsl(${29 + hash(j, i) * 6} ${36 + r * 10}% ${l}%)`;
       g.fillRect(x, y, w, h);
-      // A few grain lines along the plank.
+      // Each board its own cut: a tone drifting along its length and across it.
+      const drift = along ? g.createLinearGradient(x, y, x + w, y + h * 0.6) : g.createLinearGradient(x, y, x + w * 0.6, y + h);
+      const dk = hash(i + 5, j + 9);
+      drift.addColorStop(0, `rgba(255 225 180 / ${0.06 * dk})`);
+      drift.addColorStop(1, `rgba(70 40 18 / ${0.1 * (1 - dk)})`);
+      g.fillStyle = drift;
+      g.fillRect(x, y, w, h);
+      // Grain lines along the plank, finer and more of them, a few with a
+      // cathedral swell.
       g.lineWidth = 1;
-      for (let k = 0; k < 5; k++) {
-        g.strokeStyle = `rgba(80 50 25 / ${0.05 + hash(i + k, j) * 0.09})`;
+      for (let k = 0; k < 9; k++) {
+        g.strokeStyle = `rgba(80 50 25 / ${0.04 + hash(i + k, j) * 0.1})`;
         g.beginPath();
+        const wob = (hash(k + 3, i * 7 + j) - 0.5) * 5;
         if (along) {
-          const yy = y + h * (0.12 + hash(k, i + j) * 0.76);
+          const yy = y + h * (0.08 + hash(k, i + j) * 0.84);
           g.moveTo(x, yy);
-          g.bezierCurveTo(x + w * 0.35, yy + 2, x + w * 0.65, yy - 2, x + w, yy + 1);
+          g.bezierCurveTo(x + w * 0.35, yy + wob, x + w * 0.65, yy - wob, x + w, yy + 1);
         } else {
-          const xx = x + w * (0.12 + hash(k, i + j) * 0.76);
+          const xx = x + w * (0.08 + hash(k, i + j) * 0.84);
           g.moveTo(xx, y);
-          g.bezierCurveTo(xx + 2, y + h * 0.35, xx - 2, y + h * 0.65, xx + 1, y + h);
+          g.bezierCurveTo(xx + wob, y + h * 0.35, xx - wob, y + h * 0.65, xx + 1, y + h);
         }
         g.stroke();
       }
@@ -112,17 +139,85 @@ function parquetTexture() {
       g.strokeStyle = 'rgba(45 28 14 / 0.55)';
       g.lineWidth = 1.4;
       g.strokeRect(x, y, w, h);
-    };
-    for (let i = -reach; i <= reach; i++) {
-      for (let j = -reach; j <= reach; j++) {
-        const m = (((i - j) % (2 * n)) + 2 * n) % (2 * n);
-        if (m === 0) plank(i * c, j * c, n * c, c, i, j, true);
-        else if (m === 2 * n - 1) plank(i * c, j * c, c, n * c, i, j, false);
-      }
-    }
+    });
   });
-  t.anisotropy = 8;
-  return t;
+  // Height: dark gaps, a two-step bevel at each board's edge, a little
+  // relief from the grain.
+  const hw = 768;
+  const hh = Math.round((hw * D) / W);
+  const normal = normalTexture(
+    hw,
+    hh,
+    (g) => {
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, hw, hh);
+      layout(g, hw, hh, (x, y, w, h, i, j, along) => {
+        const v = 170 + hash(i, j + 4) * 30;
+        g.fillStyle = `rgb(${v * 0.55} ${v * 0.55} ${v * 0.55})`;
+        g.fillRect(x + 0.5, y + 0.5, w - 1, h - 1);
+        g.fillStyle = `rgb(${v} ${v} ${v})`;
+        g.fillRect(x + 1.5, y + 1.5, w - 3, h - 3);
+        g.lineWidth = 1;
+        for (let k = 0; k < 5; k++) {
+          g.strokeStyle = `rgba(0 0 0 / ${0.1 + hash(i + k, j) * 0.1})`;
+          g.beginPath();
+          if (along) {
+            const yy = y + h * (0.1 + hash(k, i + j) * 0.8);
+            g.moveTo(x + 3, yy);
+            g.lineTo(x + w - 3, yy + 0.5);
+          } else {
+            const xx = x + w * (0.1 + hash(k, i + j) * 0.8);
+            g.moveTo(xx, y + 3);
+            g.lineTo(xx + 0.5, y + h - 3);
+          }
+          g.stroke();
+        }
+      });
+    },
+    2.2,
+    false,
+  );
+  // Roughness: open gaps rough, each board its own varnish, worn paths and
+  // scuffs where feet and chair legs go.
+  const rw = 512;
+  const rh = Math.round((rw * D) / W);
+  const rough = roughTexture(
+    rw,
+    rh,
+    (g) => {
+      g.fillStyle = '#fff';
+      g.fillRect(0, 0, rw, rh);
+      layout(g, rw, rh, (x, y, w, h, i, j) => {
+        const v = 150 + hash(i + 2, j + 7) * 45;
+        g.fillStyle = `rgb(${v} ${v} ${v})`;
+        g.fillRect(x + 0.5, y + 0.5, w - 1, h - 1);
+      });
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      for (const [cx, cy, r] of [
+        [0.5, 0.62, 0.3],
+        [0.78, 0.8, 0.2],
+        [0.2, 0.75, 0.16],
+      ]) {
+        const gr = g.createRadialGradient(cx * rw, cy * rh, 0, cx * rw, cy * rh, r * rw);
+        gr.addColorStop(0, 'rgba(255 255 255 / 0.32)');
+        gr.addColorStop(1, 'rgba(255 255 255 / 0)');
+        g.fillStyle = gr;
+        g.fillRect(0, 0, rw, rh);
+      }
+      g.lineWidth = 1;
+      for (let k = 0; k < 140; k++) {
+        const x = hash(k, 31) * rw;
+        const y = hash(k, 32) * rh;
+        g.strokeStyle = `rgba(255 255 255 / ${0.12 + hash(k, 33) * 0.2})`;
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + (hash(k, 34) - 0.5) * 36, y + (hash(k, 35) - 0.5) * 36);
+        g.stroke();
+      }
+    },
+    false,
+  );
+  return { map, normal, rough };
 }
 
 // Lime plaster: the wall colour with a faint, uneven trowel texture.
@@ -142,6 +237,66 @@ function plasterTexture(base: string) {
   });
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
+}
+
+// Woven-cloth materials: a thread-weave normal map (one 128 px canvas, made
+// once, uploaded per use because each fabric tiles it differently) and a
+// sheen lobe, so wool and cotton catch light at grazing angles like cloth.
+let weaveCanvas: HTMLCanvasElement | undefined;
+function weaveNormal(rx: number, ry: number) {
+  weaveCanvas ??= normalFromHeight(greyCanvas(128, 128, (g) => weaveHeight(g, 128, 8)), 1.4);
+  const t = dataTexture(weaveCanvas);
+  t.repeat.set(rx, ry);
+  return t;
+}
+function cloth(map: THREE.Texture, repeat: number, sheenColor: number, extra: THREE.MeshPhysicalMaterialParameters = {}) {
+  return new THREE.MeshPhysicalMaterial({
+    map,
+    roughness: 1,
+    normalMap: weaveNormal(repeat, repeat),
+    normalScale: new THREE.Vector2(0.55, 0.55),
+    sheen: 0.7,
+    sheenColor: new THREE.Color(sheenColor),
+    sheenRoughness: 0.6,
+    ...extra,
+  });
+}
+
+// Painted plaster relief: very soft trowel undulation and a fine grain, so
+// the wall catches raking light without looking like stucco. Returns a normal
+// map and a roughness map; both tile.
+function plasterDetail() {
+  const soft = (g: CanvasRenderingContext2D, base: number, amp: number, grain: number) => {
+    // The trowel swells are drawn small and scaled up smoothly: soft for free.
+    const small = greyCanvas(128, 128, (s) => {
+      s.fillStyle = `rgb(${base} ${base} ${base})`;
+      s.fillRect(0, 0, 128, 128);
+      for (let k = 0; k < 90; k++) {
+        const x = hash(k, 21) * 128;
+        const y = hash(k, 22) * 128;
+        const r = 8 + hash(k, 23) * 18;
+        const v = hash(k, 24) > 0.5 ? 255 : 0;
+        s.fillStyle = `rgba(${v} ${v} ${v} / ${amp})`;
+        // Drawn at +/-128 too, so the tile has no seam.
+        for (const ox of [-128, 0, 128]) for (const oy of [-128, 0, 128]) {
+          s.beginPath();
+          s.ellipse(x + ox, y + oy, r * 1.5, r, hash(k, 25) * 3, 0, Math.PI * 2);
+          s.fill();
+        }
+      }
+    });
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(small, 0, 0, 512, 512);
+    for (let k = 0; k < 4000; k++) {
+      const v = hash(k, 26) > 0.5 ? 255 : 0;
+      g.fillStyle = `rgba(${v} ${v} ${v} / ${grain})`;
+      g.fillRect(hash(k, 27) * 512, hash(k, 28) * 512, 1 + hash(k, 29) * 2, 1 + hash(k, 30) * 2);
+    }
+  };
+  const normal = normalTexture(512, 512, (g) => soft(g, 128, 0.05, 0.22), 1.2);
+  const rough = roughTexture(512, 512, (g) => soft(g, 235, 0.04, 0.05));
+  return { normal, rough };
 }
 
 // A flat-woven wool rug: oatmeal field, charcoal border, one thin ember line.
@@ -176,9 +331,69 @@ function rugTexture() {
   });
 }
 
+// The light through the window over a Zurich day, as keyframes (hour of
+// day). Sun height `y` is the downward slope of the sun's direction.
+interface SkyColors {
+  top: string;
+  mid: string;
+  bottom: string;
+}
+interface DayLight extends SkyColors {
+  sun: string;
+  sunI: number;
+  y: number;
+  skyI: number;
+  bright: number;
+  lights: number;
+}
+const DAY_SKY: SkyColors = { top: '#cfe0ee', mid: '#f4efe4', bottom: '#f7f1e6' };
+const DAY_KEYS: [number, DayLight][] = [
+  [6, { top: '#9db2cf', mid: '#efcdbf', bottom: '#f5dcc7', sun: '#ffb894', sunI: 2.6, y: -0.3, skyI: 2.6, bright: 0.95, lights: 0 }],
+  [9, { top: '#c4d9ec', mid: '#f1ece2', bottom: '#f6f0e5', sun: '#ffe2b8', sunI: 3.8, y: -0.75, skyI: 4.2, bright: 1.1, lights: 0 }],
+  [13, { top: '#bcd7ee', mid: '#f3f0e6', bottom: '#f7f2e8', sun: '#fff0d8', sunI: 4.0, y: -0.95, skyI: 4.4, bright: 1.15, lights: 0 }],
+  [17, { top: '#cfd9e6', mid: '#f6e3c4', bottom: '#f7dcb0', sun: '#ffc485', sunI: 4.6, y: -0.58, skyI: 4, bright: 1.15, lights: 0 }],
+  [19.5, { top: '#8b9bb8', mid: '#efb99a', bottom: '#f2c9a2', sun: '#ff9f6a', sunI: 3.2, y: -0.24, skyI: 2.6, bright: 0.95, lights: 0 }],
+  [21, { top: '#3b4868', mid: '#8a7b8c', bottom: '#c79a84', sun: '#9aa6d0', sunI: 1.2, y: -0.2, skyI: 1.2, bright: 0.75, lights: 1 }],
+];
+
+/** The hour in Zurich, as a fraction (13.5 = half past one). */
+function zurichHour() {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date());
+    const n = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+    return n('hour') + n('minute') / 60;
+  } catch {
+    const d = new Date();
+    return d.getHours() + d.getMinutes() / 60;
+  }
+}
+
+/** Daylight for an hour; before dawn and after dusk it holds at those looks. */
+function daylight(hour: number): DayLight {
+  const h = Math.min(Math.max(hour, DAY_KEYS[0][0]), DAY_KEYS[DAY_KEYS.length - 1][0]);
+  let i = 0;
+  while (i < DAY_KEYS.length - 2 && h > DAY_KEYS[i + 1][0]) i++;
+  const [h0, a] = DAY_KEYS[i];
+  const [h1, b] = DAY_KEYS[i + 1];
+  const t = (h - h0) / (h1 - h0);
+  const mix = (x: string, y: string) => '#' + new THREE.Color(x).lerp(new THREE.Color(y), t).getHexString();
+  const num = (x: number, y: number) => x + (y - x) * t;
+  return {
+    top: mix(a.top, b.top),
+    mid: mix(a.mid, b.mid),
+    bottom: mix(a.bottom, b.bottom),
+    sun: mix(a.sun, b.sun),
+    sunI: num(a.sunI, b.sunI),
+    y: num(a.y, b.y),
+    skyI: num(a.skyI, b.skyI),
+    bright: num(a.bright, b.bright),
+    lights: num(a.lights, b.lights),
+  };
+}
+
 // What is outside the window: the facade across the street, a lime tree,
 // sky. Painted soft, as if slightly out of focus.
-function outsideTexture(night: boolean) {
+function outsideTexture(night: boolean, skyColors?: SkyColors, lights = 0) {
   return canvasTexture(1024, 768, (g) => {
     const w = 1024;
     const h = 768;
@@ -187,9 +402,10 @@ function outsideTexture(night: boolean) {
       sky.addColorStop(0, '#0c1220');
       sky.addColorStop(1, '#1f2433');
     } else {
-      sky.addColorStop(0, '#cfe0ee');
-      sky.addColorStop(0.7, '#f4efe4');
-      sky.addColorStop(1, '#f7f1e6');
+      const c = skyColors ?? DAY_SKY;
+      sky.addColorStop(0, c.top);
+      sky.addColorStop(0.7, c.mid);
+      sky.addColorStop(1, c.bottom);
     }
     g.fillStyle = sky;
     g.fillRect(0, 0, w, h);
@@ -203,7 +419,7 @@ function outsideTexture(night: boolean) {
       for (let col = 0; col < 6; col++) {
         const x = 160 + col * 135;
         const y = 300 + row * 150;
-        const lit = night && hash(row, col) > 0.62;
+        const lit = (night || lights > 0.5) && hash(row, col) > 0.62;
         g.fillStyle = lit ? '#e9b56c' : night ? '#14161c' : '#8b8f94';
         g.fillRect(x, y, 56, 96);
         // Shutters, as Zurich windows have.
@@ -241,6 +457,18 @@ function blobTexture() {
     g.fillStyle = r;
     g.fillRect(0, 0, 128, 128);
   }));
+}
+
+// A tiny soft dot, for dust in the light.
+function moteTexture() {
+  return canvasTexture(32, 32, (g) => {
+    const r = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    r.addColorStop(0, 'rgba(255 255 255 / 1)');
+    r.addColorStop(0.4, 'rgba(255 255 255 / 0.35)');
+    r.addColorStop(1, 'rgba(255 255 255 / 0)');
+    g.fillStyle = r;
+    g.fillRect(0, 0, 32, 32);
+  });
 }
 
 // A linear fade, for the darkening where walls meet (cheap ambient occlusion).
@@ -302,11 +530,18 @@ function fade(length: number, width: number, at: THREE.Vector3, normal: THREE.Ve
 function buildShell(scene: THREE.Scene) {
   const wallMap = plasterTexture('#efe7d9');
   wallMap.repeat.set(3, 2);
-  const wallMat = std(0xffffff, 0.95, 0, { map: wallMap });
+  const pl = plasterDetail();
+  for (const t of [pl.normal, pl.rough]) t.repeat.set(3, 2);
+  const wallMat = std(0xffffff, 0.95, 0, { map: wallMap, normalMap: pl.normal, normalScale: new THREE.Vector2(0.35, 0.35), roughnessMap: pl.rough });
   const paintMat = std(0xf3efe7, 0.5); // the white gloss of skirting and frames
 
   // Oiled, not lacquered: a soft sheen, so it does not mirror the lamp.
-  const floor = mesh(new THREE.PlaneGeometry(W, D), std(0xffffff, 0.6, 0, { map: parquetTexture(), envMapIntensity: 0.55 }), false);
+  const pq = parquetMaps();
+  const floor = mesh(
+    new THREE.PlaneGeometry(W, D),
+    std(0xffffff, 0.85, 0, { map: pq.map, normalMap: pq.normal, normalScale: new THREE.Vector2(0.9, 0.9), roughnessMap: pq.rough, envMapIntensity: 0.55 }),
+    false,
+  );
   floor.rotation.x = -Math.PI / 2;
   scene.add(floor);
 
@@ -425,7 +660,7 @@ function buildShell(scene: THREE.Scene) {
   glass.position.set(fx + 0.01, (wy0 + wy1) / 2, WIN_MID);
   scene.add(glass);
 
-  const sill = box(t + 0.06, 0.035, ww + 0.12, std(0xffffff, 0.5, 0, { map: grainTexture('#c9a77c') }), 0.006);
+  const sill = box(t + 0.06, 0.035, ww + 0.12, std(0xffffff, 0.65, 0, { ...woodParams(), map: grainTexture('#c9a77c') }), 0.006);
   sill.position.set(LEFT - t / 2 + 0.03 + 0.04, WIN.y0 + 0.0175, WIN_MID);
   scene.add(sill);
 
@@ -500,7 +735,11 @@ function buildShell(scene: THREE.Scene) {
   scene.add(curtain2);
 
   // The rug in front of the sideboard.
-  const rug = box(1.8, 0.01, 1.25, std(0xffffff, 1, 0, { map: rugTexture() }));
+  const rugMat = cloth(rugTexture(), 1, 0xd9cdb5, { sheen: 0.45 });
+  // Threads fine enough for 1.8 x 1.25 m: set the normal map's tiling to match.
+  (rugMat.normalMap as THREE.Texture).repeat.set(45, 31);
+  rugMat.normalScale.set(0.5, 0.5);
+  const rug = box(1.8, 0.01, 1.25, rugMat);
   rug.castShadow = false;
   rug.position.set(0.15, 0.005, -0.7);
   scene.add(rug);
@@ -537,8 +776,8 @@ function buildShell(scene: THREE.Scene) {
 function buildSideboard() {
   const g = new THREE.Group();
   const oakTex = grainTexture(OAK, 110);
-  const oak = std(0xffffff, 0.5, 0, { map: oakTex });
-  const oakDark = std(0xffffff, 0.6, 0, { map: grainTexture('#8e6744', 80) });
+  const oak = std(0xffffff, 0.65, 0, { ...woodParams(), map: oakTex });
+  const oakDark = std(0xffffff, 0.78, 0, { ...woodParams(), map: grainTexture('#8e6744', 80) });
   const legH = 0.16;
   const { w, d, h } = BOARD;
   const bodyH = h - legH;
@@ -604,7 +843,7 @@ function buildSideboard() {
 // A picture ledge for the four favourite records, leaning on the wall.
 function buildLedge(covers: THREE.Texture[]) {
   const g = new THREE.Group();
-  const oak = std(0xffffff, 0.5, 0, { map: grainTexture(OAK) });
+  const oak = std(0xffffff, 0.65, 0, { ...woodParams(), map: grainTexture(OAK) });
   const len = 1.95;
   const shelf = box(len, 0.022, 0.1, oak, 0.003);
   shelf.position.set(0, 0, 0.05);
@@ -694,10 +933,11 @@ function buildGuitarStand(guitar: THREE.Object3D) {
 // A tripod floor lamp with a linen drum shade.
 function buildFloorLamp() {
   const g = new THREE.Group();
-  const wood = std(0xffffff, 0.5, 0, { map: grainTexture('#8e6744') });
+  const wood = std(0xffffff, 0.65, 0, { ...woodParams(), map: grainTexture('#8e6744') });
   const shadeY = 1.42;
   for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2 + 0.4;
+    // Feet at 45, 165 and 285 degrees: one points into the room, none into a wall.
+    const a = (i / 3) * Math.PI * 2 + Math.PI / 4;
     const foot = new THREE.Vector3(Math.cos(a) * 0.26, 0, Math.sin(a) * 0.26);
     const top = new THREE.Vector3(0, 1.18, 0);
     const len = foot.distanceTo(top);
@@ -743,6 +983,72 @@ function buildFloorLamp() {
   return { group: g, shadeMat, bulb, down, up: upLight };
 }
 
+// Leaf detail, shared by both plants: a colour map (dark blade, pale midrib
+// and veins) and a normal map (raised midrib, grooved side veins), on
+// 0-1 UVs across the leaf. No wrapping.
+let leafTex: { map: THREE.Texture; normal: THREE.Texture } | undefined;
+function leafMaps() {
+  if (leafTex) return leafTex;
+  const W2 = 128;
+  const H2 = 256;
+  const veins = (g: CanvasRenderingContext2D, rib: string, vein: string, ribW: number, veinW: number) => {
+    g.lineCap = 'round';
+    g.strokeStyle = rib;
+    g.lineWidth = ribW;
+    g.beginPath();
+    g.moveTo(W2 / 2, 0);
+    g.lineTo(W2 / 2, H2);
+    g.stroke();
+    g.strokeStyle = vein;
+    g.lineWidth = veinW;
+    for (let k = 0; k < 14; k++) {
+      const y = 10 + k * 17;
+      for (const sgn of [-1, 1]) {
+        g.beginPath();
+        g.moveTo(W2 / 2, y);
+        g.quadraticCurveTo(W2 / 2 + sgn * 26, y + 8, W2 / 2 + sgn * 54, y + 30);
+        g.stroke();
+      }
+    }
+  };
+  const map = canvasTexture(W2, H2, (g) => {
+    const gr = g.createLinearGradient(0, 0, W2, 0);
+    gr.addColorStop(0, '#26401f');
+    gr.addColorStop(0.5, '#34542c');
+    gr.addColorStop(1, '#26401f');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, W2, H2);
+    for (let k = 0; k < 300; k++) {
+      g.fillStyle = `rgba(${hash(k, 41) > 0.5 ? '120 160 90' : '10 25 10'} / 0.05)`;
+      g.fillRect(hash(k, 42) * W2, hash(k, 43) * H2, 2 + hash(k, 44) * 6, 2 + hash(k, 45) * 6);
+    }
+    veins(g, 'rgba(160 190 120 / 0.55)', 'rgba(120 160 90 / 0.28)', 5, 1.6);
+  });
+  map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+  const normal = normalTexture(
+    W2,
+    H2,
+    (g) => {
+      g.fillStyle = '#707070';
+      g.fillRect(0, 0, W2, H2);
+      veins(g, '#ffffff', '#303030', 7, 2.5);
+    },
+    2.2,
+    false,
+  );
+  return (leafTex = { map, normal });
+}
+// Maps a leaf outline's x/y onto 0-1 so leafMaps() lies along it.
+function leafUV(geo: THREE.BufferGeometry, wid: number, len: number) {
+  const p = geo.attributes.position as THREE.BufferAttribute;
+  const uv = new Float32Array(p.count * 2);
+  for (let k = 0; k < p.count; k++) {
+    uv[k * 2] = p.getX(k) / (wid * 2.2) + 0.5;
+    uv[k * 2 + 1] = p.getY(k) / len;
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
+
 // A rubber plant in a white pot: glossy oval leaves up a single stem.
 function buildPlant() {
   const g = new THREE.Group();
@@ -774,6 +1080,7 @@ function buildPlant() {
       shape.bezierCurveTo(wid, len * 0.15, wid * 0.9, len * 0.8, 0, len);
       shape.bezierCurveTo(-wid * 0.9, len * 0.8, -wid, len * 0.15, 0, 0);
       const geo = new THREE.ShapeGeometry(shape, 8);
+      leafUV(geo, wid, len);
       // Cup the leaf and let it droop.
       const p = geo.attributes.position as THREE.BufferAttribute;
       for (let k = 0; k < p.count; k++) {
@@ -793,7 +1100,21 @@ function buildPlant() {
       leafGeos.push(geo);
     }
   });
-  const leaves = mesh(mergeGeometries(leafGeos), std(0x2f4a2c, 0.62, 0, { side: THREE.DoubleSide, envMapIntensity: 0.5 }));
+  const lm = leafMaps();
+  // Sheen stands in for light coming through thin leaf: a warm green glow at
+  // grazing angles, far cheaper than transmission.
+  const leafMat = new THREE.MeshPhysicalMaterial({
+    map: lm.map,
+    normalMap: lm.normal,
+    normalScale: new THREE.Vector2(0.7, 0.7),
+    roughness: 0.55,
+    side: THREE.DoubleSide,
+    envMapIntensity: 0.5,
+    sheen: 0.5,
+    sheenColor: new THREE.Color(0x7fa850),
+    sheenRoughness: 0.45,
+  });
+  const leaves = mesh(mergeGeometries(leafGeos), leafMat);
   g.add(leaves);
   return g;
 }
@@ -839,8 +1160,8 @@ function knitTexture() {
 // over one arm. Origin at the centre of its footprint, +z its front.
 function buildArmchair() {
   const g = new THREE.Group();
-  const wool = std(0xffffff, 0.95, 0, { map: woolTexture('#7a6c5f', 'rgba(255 240 220 / 0.08)') });
-  const oak = std(0xffffff, 0.55, 0, { map: grainTexture('#8e6744', 60) });
+  const wool = cloth(woolTexture('#7a6c5f', 'rgba(255 240 220 / 0.08)'), 26, 0xa89a88);
+  const oak = std(0xffffff, 0.72, 0, { ...woodParams(), map: grainTexture('#8e6744', 60) });
   const rb = (w: number, h: number, d: number, r: number, mat: THREE.Material) => mesh(new RoundedBoxGeometry(w, h, d, 3, r), mat);
   for (const x of [-0.31, 0.31]) {
     for (const z of [-0.31, 0.31]) {
@@ -868,7 +1189,7 @@ function buildArmchair() {
     g.add(arm);
   }
   // The one bright thing in the corner: a rust cushion, a little askew.
-  const cushion = rb(0.4, 0.36, 0.12, 0.06, std(0xffffff, 0.95, 0, { map: woolTexture('#b9532c', 'rgba(255 200 160 / 0.1)') }));
+  const cushion = rb(0.4, 0.36, 0.12, 0.06, cloth(woolTexture('#b9532c', 'rgba(255 200 160 / 0.1)'), 18, 0xe08a60));
   cushion.position.set(-0.08, 0.6, -0.17);
   cushion.rotation.set(-0.32, 0.12, 0.12);
   g.add(cushion);
@@ -897,14 +1218,39 @@ function buildArmchair() {
     pos.setXYZ(i, p.x + 0.012 + (k === 2 ? wob + hang * 0.02 : 0), p.y + 0.012 + (k < 2 ? wob * 0.5 : 0), z * (1 + hang * 0.12) + 0.06);
   }
   geo.computeVertexNormals();
-  g.add(mesh(geo, std(0xffffff, 1, 0, { map: knitTexture(), side: THREE.DoubleSide })));
+  // Chunky knit: the V stitches drawn again as a height field, thick yarn.
+  const knitN = normalTexture(
+    256,
+    256,
+    (c) => {
+      c.fillStyle = '#303030';
+      c.fillRect(0, 0, 256, 256);
+      c.lineWidth = 7;
+      c.lineCap = 'round';
+      for (let y = 0; y < 256; y += 16) {
+        for (let x = 0; x < 256; x += 16) {
+          c.strokeStyle = `rgb(${200 + hash(x, y) * 40} ${200 + hash(x, y) * 40} ${200 + hash(x, y) * 40})`;
+          c.beginPath();
+          c.moveTo(x + 1, y + 2);
+          c.lineTo(x + 8, y + 14);
+          c.lineTo(x + 15, y + 2);
+          c.stroke();
+        }
+      }
+    },
+    2.4,
+  );
+  knitN.repeat.set(4, 4);
+  const knit = cloth(knitTexture(), 4, 0xf2e8d6, { side: THREE.DoubleSide, normalMap: knitN, sheen: 0.8 });
+  knit.normalScale.set(0.9, 0.9);
+  g.add(mesh(geo, knit));
   return g;
 }
 
 // A round oak side table with a ceramic lamp, a mug and a few books.
 function buildSideTable() {
   const g = new THREE.Group();
-  const oak = std(0xffffff, 0.5, 0, { map: grainTexture('#a77c52', 70) });
+  const oak = std(0xffffff, 0.65, 0, { ...woodParams(), map: grainTexture('#a77c52', 70) });
   const topY = 0.52;
   const top = cyl(0.23, 0.23, 0.025, oak, 40);
   top.position.y = topY - 0.0125;
@@ -1003,6 +1349,7 @@ function buildSmallPlant() {
     shape.bezierCurveTo(l * 0.6, l * 0.2, l * 0.5, l * 0.9, 0, l);
     shape.bezierCurveTo(-l * 0.5, l * 0.9, -l * 0.6, l * 0.2, 0, 0);
     const geo = new THREE.ShapeGeometry(shape, 4);
+    leafUV(geo, l * 0.6, l);
     const a = i * 2.4;
     const r = 0.02 + hash(i, 1) * 0.04;
     // Some leaves trail over the rim and down.
@@ -1017,7 +1364,7 @@ function buildSmallPlant() {
     );
     geos.push(geo);
   }
-  g.add(mesh(mergeGeometries(geos), std(0x4c6b3a, 0.5, 0, { side: THREE.DoubleSide }), false));
+  g.add(mesh(mergeGeometries(geos), new THREE.MeshPhysicalMaterial({ map: leafMaps().map, roughness: 0.5, side: THREE.DoubleSide, sheen: 0.5, sheenColor: new THREE.Color(0x9bc060), sheenRoughness: 0.5 }), false));
   return g;
 }
 
@@ -1099,6 +1446,7 @@ interface Hoverable {
 
 export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' });
+  setMaxAnisotropy(renderer.capabilities.getMaxAnisotropy());
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1197,10 +1545,10 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   // The floor lamp in the corner behind the guitar; the big plant by the
   // window, where the light is.
   const lamp = buildFloorLamp();
-  lamp.group.position.set(-1.52, 0, BACK + 0.24);
+  lamp.group.position.set(-1.48, 0, BACK + 0.3);
   lamp.down.target.position.set(0.9, 0, 0.5);
   scene.add(lamp.group);
-  scene.add(blob(0.6, 0.6, -1.52, 0, BACK + 0.24, 0.35));
+  scene.add(blob(0.6, 0.6, -1.48, 0, BACK + 0.3, 0.35));
 
   const plant = buildPlant();
   plant.position.set(-1.42, 0, -0.62);
@@ -1278,26 +1626,32 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   function bakeEnvironment() {
     scene.environment = seed.texture;
     renderer.shadowMap.needsUpdate = true;
+    const motesWere = motes.visible;
+    motes.visible = false;
     const next = pmrem.fromScene(scene, 0.04, 0.05, 20, { size: 128, position: new THREE.Vector3(0.2, 1.1, 0.2) });
     renderer.setRenderTarget(null);
     envTarget?.dispose();
     envTarget = next;
     scene.environment = next.texture;
+    motes.visible = motesWere;
     renderer.shadowMap.needsUpdate = true;
   }
 
   // Day by default; night when the reader's system is in dark mode, unless
   // the caller says otherwise.
   const dark = matchMedia('(prefers-color-scheme: dark)');
-  const dayOutside = shell.outsideMat.map!;
+  let dayOutside: THREE.Texture | undefined;
   let nightOutside: THREE.Texture | undefined;
   function setMood() {
     const night = options.mood ? options.mood === 'night' : dark.matches;
     // At night the same light is the street and the moon: faint and cool.
     // By day: late afternoon, low golden sun.
-    sun.color.setHex(night ? 0x8ea3c8 : 0xffc485);
-    sun.intensity = night ? 0.35 : 4.6;
-    sky.intensity = night ? 0 : 4;
+    const dl = daylight(options.hour ?? zurichHour());
+    sun.color.set(night ? 0x8ea3c8 : dl.sun);
+    sun.intensity = night ? 0.35 : dl.sunI;
+    sunDir.set(1, night ? -0.58 : dl.y, -0.16).normalize();
+    sun.position.copy(sun.target.position).addScaledVector(sunDir, -7);
+    sky.intensity = night ? 0 : dl.skyI;
     // A warm floor of fill, so nothing goes black at night.
     hemi.intensity = night ? 0.45 : 0.45;
     hemi.color.setHex(night ? 0x8a6a50 : 0xffeedb);
@@ -1310,8 +1664,16 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     table.shadeMat.emissiveIntensity = night ? 0.9 : 0;
     (lamp.bulb.material as THREE.MeshBasicMaterial).color.setHex(night ? 0xfff1dc : 0xd8d2c8);
     if (night) nightOutside ??= outsideTexture(true);
-    shell.outsideMat.map = night ? nightOutside! : dayOutside;
-    shell.outsideMat.color.setScalar(night ? 0.8 : 1.15);
+    if (!night) {
+      const old = shell.outsideMat.map;
+      if (old && old !== nightOutside) old.dispose();
+      dayOutside = outsideTexture(false, dl, dl.lights);
+    }
+    shell.outsideMat.map = night ? nightOutside! : dayOutside!;
+    shell.outsideMat.color.setScalar(night ? 0.8 : dl.bright);
+    moteMat.color.set(night ? 0xffc890 : 0xfff0d4);
+    moteMat.opacity = night ? 0.45 : 0.4;
+    placeMotes(night);
     shell.outsideMat.needsUpdate = true;
     scene.environmentIntensity = night ? 0.6 : 0.5;
     renderer.toneMappingExposure = night ? 1.12 : 1.02;
@@ -1319,6 +1681,47 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     requestRender();
   }
   if (!options.mood) dark.addEventListener('change', setMood);
+
+  // Dust drifting in the window light by day, and round the lamp at night.
+  const MOTES = 70;
+  const motePos = new Float32Array(MOTES * 3);
+  const moteGeo = new THREE.BufferGeometry();
+  moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+  const moteMat = new THREE.PointsMaterial({
+    size: 0.016,
+    map: moteTexture(),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+  });
+  const motes = new THREE.Points(moteGeo, moteMat);
+  motes.frustumCulled = false;
+  motes.visible = !options.reducedMotion;
+  scene.add(motes);
+  let moteBox = { x0: 0, x1: 1, y0: 0, y1: 1, z0: 0, z1: 1 };
+  function placeMotes(night: boolean) {
+    moteBox = night
+      ? { x0: -2.0, x1: -0.7, y0: 0.5, y1: 1.9, z0: -1.75, z1: -0.7 }
+      : { x0: -1.7, x1: 0.5, y0: 0.5, y1: 2.15, z0: -1.55, z1: -0.1 };
+    moteDrift(0);
+  }
+  function moteDrift(time: number) {
+    const b = moteBox;
+    const rangeY = b.y1 - b.y0;
+    for (let i = 0; i < MOTES; i++) {
+      const sx = hash(i, 41);
+      const sy = hash(i, 42);
+      const sz = hash(i, 43);
+      const speed = 0.006 + hash(i, 44) * 0.012;
+      const yy = ((sy * rangeY - time * speed) % rangeY + rangeY) % rangeY;
+      const wob = time * (0.08 + hash(i, 45) * 0.1) + sx * 20;
+      motePos[i * 3] = b.x0 + sx * (b.x1 - b.x0) + Math.sin(wob) * 0.08;
+      motePos[i * 3 + 1] = b.y0 + yy;
+      motePos[i * 3 + 2] = b.z0 + sz * (b.z1 - b.z0) + Math.cos(wob * 0.8) * 0.08;
+    }
+    moteGeo.attributes.position.needsUpdate = true;
+  }
 
   // ------------------------------------------------------------ Hover
 
@@ -1351,7 +1754,8 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
       const cloned = mats.map((mat) => {
         if (!(mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) return mat;
         const c = (mat as THREE.MeshStandardMaterial).clone();
-        list.push({ mat: c, base: c.emissive.clone(), baseI: c.emissiveIntensity });
+        // Indicator lights (named led-*) stay as built: no hover glow.
+        if (!m.name.startsWith('led')) list.push({ mat: c, base: c.emissive.clone(), baseI: c.emissiveIntensity });
         return c;
       });
       m.material = Array.isArray(m.material) ? cloned : cloned[0];
@@ -1360,6 +1764,22 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   }
   const roots = hoverables.map((h) => h.root);
   const lift = new Map<THREE.Object3D, number>(); // 0..1 per root
+
+  function applyLift(h: Hoverable, l: number) {
+    lift.set(h.root, l);
+    for (const e of emissives.get(h.root)!) {
+      e.mat.emissive.copy(e.base).lerp(glow, Math.min(l, 1) * (h.record !== undefined ? 0.06 : 0.14) * (h.record !== undefined && h.record === held && l <= 0.45 ? 0 : 1));
+      e.mat.emissiveIntensity = l > 0.5 ? Math.max(e.baseI, 1) : e.baseI;
+    }
+    if (h.record !== undefined) {
+      // Pulled forward and up off the ledge, as if to look at it.
+      const n = nudges.get(h.root) ?? 0;
+      h.root.position.y = h.root.userData.baseY + l * 0.05 + n * 0.004;
+      h.root.position.z = 0.075 + l * 0.03;
+      h.root.rotation.x = h.root.userData.baseRx * (1 - l * 0.6) + n * 0.02;
+      renderer.shadowMap.needsUpdate = true;
+    }
+  }
 
   function hoverableOf(o: THREE.Object3D | null) {
     while (o) {
@@ -1378,7 +1798,7 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   const tipListen = document.createElement('span');
   tipListen.className = 'listen';
   tipListen.hidden = true;
-  tipListen.textContent = 'Listen on Spotify';
+  tipListen.textContent = 'Click to play';
   tip.append(tipTitle, tipText, tipListen);
   stage.append(tip);
   let tipFor: Hoverable | undefined;
@@ -1405,10 +1825,376 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     }
     tipTitle.textContent = h.info.title;
     tipText.textContent = h.info.text;
-    tipListen.hidden = !h.info.url;
+    const act = actionFor(h);
+    tipListen.textContent = act ?? '';
+    tipListen.hidden = !act;
     tip.classList.add('is-on');
     placeTip(h);
   }
+
+  // ------------------------------------------------------------ Playback
+
+  // Click a sleeve and its record slides out of the top of the sleeve, is
+  // carried over to the turntable on a curve, turns flat, hovers a moment over
+  // the spindle, is lowered on and settles; then the platter spins up and the
+  // tonearm lifts, swings in and is lowered into the groove. Click it (or the
+  // turntable) again to lift the arm and stop. Nothing is heard; it is the
+  // room that plays. The album itself opens from the note below.
+  //
+  // Everything is time-based (the frame's dt, clamped), built from small
+  // "steps": a step takes a progress 0..1 and sets the pose for it, so the
+  // same step plays forward to put a record on and backward to take it off,
+  // and the lab page can freeze the sequence at any moment.
+  const TAU = Math.PI * 2;
+  const RPM = (33.333 / 60) * TAU;
+  const lerp = THREE.MathUtils.lerp;
+  const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+  const span = (t: number, a: number, b: number) => clamp01((t - a) / (b - a));
+  const smooth = (t: number) => t * t * (3 - 2 * t);
+  const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+  const inOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+  const outQuad = (t: number) => 1 - (1 - t) * (1 - t);
+  const outCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+  // Parts that move. The lighting bake leaves them out of its fingerprint and
+  // gives them no baked occlusion of their own (where they sit depends on
+  // timing); they still shade their surroundings from their resting place.
+  for (const o of [...records, turntable.spin, turntable.arm]) o.traverse((c) => (c.userData.bakeDynamic = true));
+  const armHomeY = turntable.arm.position.y;
+  const SEAT = turntable.spin.position.clone(); // the record lying on the platter
+  const ARM_UP = 0.012; // lifted clear of the rest and the record
+  const ARM_DOWN = 0.0055; // the stylus in the groove
+  const HOVER = 0.075; // the record's height over the spindle while it lines up
+  const SLIDE = 0.335; // how far the record travels up out of its sleeve
+  const MISALIGN = new THREE.Vector3(0.0075, 0, 0.005); // off the spindle until it lines up
+  /** Which record's disc is out of its sleeve (on the platter); the first is already on. */
+  let held = 0;
+  let playing = false;
+  let spinSpeed = 0; // 0..1 of 33 1/3 rpm
+  let spinAngle = 0;
+  let armYaw = 0;
+  let armLift = 0;
+  /** The disc's pose in the turntable's space, without its own spin. */
+  const disc = { p: SEAT.clone(), q: new THREE.Quaternion() };
+  let busy = false;
+  let pendingAct: (() => Promise<void>) | undefined;
+  /** What `startPlayback` waits for before the needle drops and the platter turns. */
+  let playGate: () => Promise<unknown> = () => Promise.resolve();
+
+  interface Tween {
+    t: number;
+    dur: number;
+    fn: (e: number) => void;
+    done: () => void;
+  }
+  const tweens = new Set<Tween>();
+  function tween(dur: number, fn: (e: number) => void) {
+    return new Promise<void>((done) => {
+      if (options.reducedMotion || disposed) {
+        fn(1);
+        requestRender();
+        done();
+        return;
+      }
+      tweens.add({ t: 0, dur, fn, done });
+      requestRender();
+    });
+  }
+
+  // A sleeve nudged a little by the record sliding past it.
+  const nudges = new Map<THREE.Object3D, number>();
+  function nudge(i: number, n: number) {
+    nudges.set(records[i], n);
+    const h = hoverables.find((x) => x.record === i);
+    if (h) applyLift(h, lift.get(h.root) ?? 0);
+  }
+
+  // Where a sleeve is, in the turntable's own space, and where its record
+  // sits in it: just behind the cover, slid up and out of the top opening.
+  const sf = { s0: new THREE.Vector3(), e: new THREE.Vector3(), up: new THREE.Vector3(), fwd: new THREE.Vector3(), q: new THREE.Quaternion() };
+  const sfMat = new THREE.Matrix4();
+  const sfInv = new THREE.Matrix4();
+  const sfPos = new THREE.Vector3();
+  const sfScale = new THREE.Vector3();
+  const quarter = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+  function sleeveFrame(i: number) {
+    records[i].updateWorldMatrix(true, false);
+    turntable.group.updateWorldMatrix(true, false);
+    sfInv.copy(turntable.group.matrixWorld).invert();
+    sfMat.multiplyMatrices(sfInv, records[i].matrixWorld);
+    sfMat.decompose(sfPos, sf.q, sfScale);
+    sf.up.set(0, 1, 0).applyQuaternion(sf.q);
+    sf.fwd.set(0, 0, 1).applyQuaternion(sf.q);
+    sf.s0.set(0, 0.1575, -0.016).applyMatrix4(sfMat);
+    sf.e.copy(sf.s0).addScaledVector(sf.up, SLIDE);
+    return sf;
+  }
+
+  const qa = new THREE.Quaternion();
+  const qb = new THREE.Quaternion();
+  const qw = new THREE.Quaternion();
+  const eu = new THREE.Euler();
+  const hoverAt = SEAT.clone().add(new THREE.Vector3(0, HOVER, 0));
+  const hoverOff = hoverAt.clone().add(MISALIGN);
+  const carryPath = new THREE.CatmullRomCurve3(Array.from({ length: 5 }, () => new THREE.Vector3()), false, 'centripetal');
+  const touch = () => (renderer.shadowMap.needsUpdate = true);
+
+  /** 1. Out of the sleeve (e = 0), up through its top opening, along its own plane (e = 1). */
+  function slideStep(i: number, e: number) {
+    const k = smooth(e);
+    nudge(i, 0.8 * Math.sin(Math.PI * k));
+    const f = sleeveFrame(i);
+    disc.p.lerpVectors(f.s0, f.e, k);
+    disc.q.copy(f.q).multiply(quarter);
+    touch();
+  }
+
+  /** 2. Carry, from the sleeve's top to over the spindle: a curve, turning flat in the middle. */
+  function carryStep(i: number, e: number, back: boolean) {
+    // The sleeve settles back a little once the record has left it.
+    nudge(i, back ? 0 : -0.35 * Math.exp(-5 * e) * Math.sin(Math.PI * 4 * e));
+    const f = sleeveFrame(i);
+    const c = smoother(Math.pow(e, 0.8));
+    // Up and forward out of the sleeve (clear of the ledge), over the room's
+    // clutter, and down to over the spindle.
+    const side = Math.sign(f.e.x - hoverAt.x) || 1;
+    const wp = carryPath.points;
+    wp[0].copy(f.e);
+    wp[1].copy(f.e).addScaledVector(f.up, 0.1).addScaledVector(f.fwd, 0.22);
+    wp[2].set(lerp(f.e.x, hoverAt.x, 0.6), hoverAt.y + 0.45, lerp(wp[1].z, hoverAt.z, 0.6));
+    wp[3].set(hoverOff.x + side * 0.05, hoverOff.y + 0.22, hoverOff.z);
+    wp[4].copy(hoverOff);
+    carryPath.updateArcLengths();
+    carryPath.getPointAt(c, disc.p);
+    // Upright to flat, mostly in the middle third, with a little roll and yaw
+    // of its own so it does not turn like a machine.
+    qa.copy(f.q).multiply(quarter);
+    qb.identity();
+    qa.slerp(qb, smoother(span(c, 0.4, 0.85)));
+    const bell = Math.sin(Math.PI * c);
+    eu.set(0.05 * bell * Math.sin(5 * c), 0.09 * bell * Math.sin(3.2 * c + 0.5), 0.11 * bell * Math.sin(4.2 * c + 0.8));
+    qw.setFromEuler(eu);
+    disc.q.copy(qw).multiply(qa);
+    touch();
+  }
+
+  /** 3. Hover: ease the hole over the spindle (e = 1: exactly over it). */
+  function hoverStep(e: number) {
+    const m = 1 - outCubic(e);
+    disc.p.copy(hoverAt).addScaledVector(MISALIGN, m);
+    disc.q.identity();
+    touch();
+  }
+
+  /** 4. Straight down onto the spindle (e = 1: resting on the platter). */
+  function dropStep(e: number) {
+    const k = 0.5 * smooth(e) + 0.5 * e;
+    disc.p.lerpVectors(hoverAt, SEAT, k);
+    disc.q.identity();
+    touch();
+  }
+
+  /** On contact: a couple of millimetres of bounce, a tiny wobble, then still. */
+  const SETTLE = 0.5;
+  function settleStep(e: number) {
+    const t = e * SETTLE;
+    const fade = 1 - smooth(span(e, 0.8, 1));
+    const decay = Math.exp(-7.5 * t) * fade;
+    const rx = 0.009 * decay * Math.sin(TAU * 3.6 * t + 0.3);
+    const rz = 0.006 * decay * Math.cos(TAU * 3.1 * t);
+    const bounce = Math.max(-0.0004, 0.0022 * Math.exp(-7.5 * t) * Math.sin(TAU * 4.4 * t)) * fade;
+    // The rim never dips into the mat as the record rocks.
+    disc.p.copy(SEAT);
+    disc.p.y += bounce + Math.max(Math.abs(rx), Math.abs(rz)) * 0.152 * 0.9;
+    disc.q.setFromEuler(eu.set(rx, 0, rz));
+    touch();
+  }
+
+  // Putting a record on, in stages. Resolves when the record is on the
+  // spindle, with `settled` for its last wobble (the platter can start already).
+  async function placeRecord(i: number) {
+    turntable.setLabel(covers[i]);
+    turntable.spin.visible = true;
+    held = i;
+    spinAngle = 0;
+    spinSpeed = 0;
+    refreshTip();
+    await tween(0.45, (e) => slideStep(i, e));
+    await tween(0.95, (e) => carryStep(i, e, false));
+    await tween(0.2, hoverStep);
+    await tween(0.38, dropStep);
+    return { settled: tween(SETTLE, settleStep) };
+  }
+
+  // Taking it off: the same stages backwards, into its sleeve.
+  async function removeRecord(i: number) {
+    const a0 = spinAngle;
+    const a1 = Math.round(a0 / TAU) * TAU;
+    await tween(0.34, (e) => dropStep(1 - e));
+    await tween(0.2, (e) => hoverStep(1 - e));
+    // The label comes round to upright on the way, so it enters its sleeve square.
+    await Promise.all([
+      tween(0.95, (e) => carryStep(i, 1 - e, true)),
+      tween(0.95, (e) => (spinAngle = lerp(a0, a1, smooth(e)))),
+    ]);
+    await tween(0.45, (e) => slideStep(i, 1 - e));
+    nudge(i, 0);
+    turntable.spin.visible = false;
+    held = -1;
+    refreshTip();
+  }
+
+  // The tonearm.
+  async function armTo(yaw: number, lift: number, dur: number, curve = smooth) {
+    const y0 = armYaw;
+    const l0 = armLift;
+    await tween(dur, (e) => {
+      const k = curve(e);
+      armYaw = lerp(y0, yaw, k);
+      armLift = lerp(l0, lift, k);
+      touch();
+    });
+  }
+  /** The platter's speed, 0..1 of 33 1/3 rpm. */
+  function spinTo(goal: number, dur: number, curve: (e: number) => number) {
+    const s0 = spinSpeed;
+    return tween(dur, (e) => (spinSpeed = e >= 1 ? goal : lerp(s0, goal, curve(e))));
+  }
+  const spinUp = (e: number) => e * e; // slow, then faster, as the motor takes the platter
+  const spinDown = (e: number) => 1 - Math.exp(-4.2 * e) * (1 - e); // a natural coast to a stop
+
+  /** Spin-up and needle drop. `playGate` is what to wait for first (e.g. music starting). */
+  async function startPlayback() {
+    playing = true;
+    refreshTip();
+    await playGate();
+    const turning = spinTo(1, 1.05, spinUp);
+    await armTo(0, ARM_UP, 0.16, outQuad); // lifts a little off its rest
+    await armTo(turntable.armPlay, ARM_UP, 0.7, inOut); // over the lead-in groove
+    await armTo(turntable.armPlay, ARM_DOWN, 0.85, outCubic); // lowered like a cue lever
+    // ...and a tiny settle in the groove.
+    await tween(0.22, (e) => {
+      armLift = ARM_DOWN + 0.0006 * Math.exp(-9 * e) * Math.sin(Math.PI * 3 * e) * (1 - e);
+      touch();
+    });
+    await turning;
+  }
+  async function stopPlayback() {
+    playing = false;
+    refreshTip();
+    await armTo(armYaw, ARM_UP, 0.28, outCubic);
+    const braking = spinTo(0, 1.5, spinDown);
+    await armTo(0, ARM_UP, 0.95, inOut);
+    await armTo(0, 0, 0.3, outQuad);
+    await braking;
+  }
+  async function choose(i: number) {
+    if (held === i) {
+      if (playing) await stopPlayback();
+      else await startPlayback();
+      return;
+    }
+    if (playing || armYaw !== 0 || spinSpeed > 0) await stopPlayback();
+    if (held >= 0) await removeRecord(held);
+    const { settled } = await placeRecord(i);
+    await Promise.all([settled, startPlayback()]);
+  }
+  /** One thing at a time; a click during a move waits its turn (the latest wins). */
+  async function act(run: () => Promise<void>) {
+    if (busy) {
+      pendingAct = run;
+      return;
+    }
+    busy = true;
+    try {
+      await run();
+    } finally {
+      busy = false;
+    }
+    const next = pendingAct;
+    pendingAct = undefined;
+    if (next && !disposed) void act(next);
+  }
+  function toggleTurntable() {
+    if (held < 0) return;
+    void act(() => (playing ? stopPlayback() : startPlayback()));
+  }
+
+  /** Lab only: freeze the put-a-record-on sequence `sec` seconds in (no timers), and report the pose. */
+  function seek(i: number, sec: number) {
+    tweens.clear();
+    turntable.setLabel(covers[i]);
+    turntable.spin.visible = true;
+    held = i;
+    spinAngle = 0;
+    spinSpeed = 0;
+    armYaw = 0;
+    armLift = 0;
+    const stages: [number, (e: number) => void][] = [
+      [0.45, (e) => slideStep(i, e)],
+      [0.95, (e) => carryStep(i, e, false)],
+      [0.2, hoverStep],
+      [0.38, dropStep],
+      [SETTLE, settleStep],
+      [0.16, (e) => (armLift = lerp(0, ARM_UP, outQuad(e)))],
+      [0.7, (e) => (armYaw = lerp(0, turntable.armPlay, inOut(e)))],
+      [0.85, (e) => (armLift = lerp(ARM_UP, ARM_DOWN, outCubic(e)))],
+    ];
+    let left = sec;
+    for (const [d, fn] of stages) {
+      if (left >= d) {
+        fn(1);
+        left -= d;
+      } else {
+        fn(left / d);
+        break;
+      }
+    }
+    refreshTip();
+    touch();
+    requestRender();
+    return { x: disc.p.x, y: disc.p.y, z: disc.p.z, q: [disc.q.x, disc.q.y, disc.q.z, disc.q.w] };
+  }
+
+  // What the note says is on offer for an object.
+  function actionFor(h: Hoverable) {
+    if (h.record !== undefined) return playing && held === h.record ? 'Click to stop' : 'Click to play';
+    if (h.key === 'turntable' && held >= 0) return playing ? 'Click to stop' : 'Click to play';
+    return undefined;
+  }
+  function refreshTip() {
+    const was = tipFor;
+    tipFor = undefined;
+    showTip(was);
+    now.classList.toggle('is-on', playing && held >= 0);
+    if (held >= 0 && recordInfo[held]) {
+      nowTitle.textContent = recordInfo[held].title;
+      nowArtist.textContent = recordInfo[held].artist;
+      nowLink.href = recordInfo[held].url;
+    }
+  }
+
+  // The caption under the room: what is on the turntable, a way to the album,
+  // and a way to stop. Hidden from assistive tech with the rest of the stage
+  // (the lists below carry the real links).
+  const now = document.createElement('div');
+  now.className = 'room-now';
+  const nowText = document.createElement('div');
+  const nowLabel = document.createElement('span');
+  nowLabel.className = 'room-now-label';
+  nowLabel.textContent = 'On the turntable';
+  const nowTitle = document.createElement('strong');
+  const nowArtist = document.createElement('span');
+  nowText.append(nowLabel, nowTitle, nowArtist);
+  const nowLink = document.createElement('a');
+  nowLink.tabIndex = -1;
+  nowLink.textContent = 'Listen on Spotify';
+  const nowStop = document.createElement('button');
+  nowStop.type = 'button';
+  nowStop.tabIndex = -1;
+  nowStop.textContent = 'Stop';
+  nowStop.addEventListener('click', () => toggleTurntable());
+  now.append(nowText, nowLink, nowStop);
+  stage.append(now);
 
   // Hotspots: a small ember dot on each thing that can be hovered, until the
   // visitor has hovered one (then they know, and the dots go for good).
@@ -1495,11 +2281,21 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   const clock = new THREE.Clock();
   let disposed = false;
   let readyCalled = false;
+  let time = 0;
+  const qSpin = new THREE.Quaternion();
+  const Y_AXIS = new THREE.Vector3(0, 1, 0);
   function frame() {
     if (disposed) return;
     const dt = Math.min(clock.getDelta(), 0.05);
     lean.lerp(leanTo, 1 - Math.pow(0.002, dt));
-    camera.position.set(eye.x + lean.x * 0.5, eye.y - lean.y * 0.18, eye.z);
+    time += dt;
+    // A slow idle drift, as if breathing, besides the lean toward the pointer.
+    const drift = options.reducedMotion ? 0 : 1;
+    camera.position.set(
+      eye.x + lean.x * 0.5 + Math.sin(time * 0.21) * 0.035 * drift,
+      eye.y - lean.y * 0.18 + Math.sin(time * 0.17 + 1) * 0.01 * drift,
+      eye.z,
+    );
     camera.lookAt(target);
 
     if (pointerDirty) {
@@ -1518,37 +2314,48 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     const k = options.reducedMotion ? 1 : 1 - Math.pow(0.0005, dt);
     for (const h of hoverables) {
       const on = !!hovered && (hovered.root === h.root || !!hovered.partners?.includes(h.root));
-      const goal = on ? 1 : 0;
+      // A sleeve whose record is out stays a little proud of the ledge.
+      const goal = on ? 1 : h.record !== undefined && h.record === held ? 0.45 : 0;
       const now = lift.get(h.root) ?? 0;
       if (now === goal) continue;
       let next = now + (goal - now) * k;
       if (Math.abs(goal - next) < 0.002) next = goal;
       else moving = true;
-      lift.set(h.root, next);
-      const l = lift.get(h.root)!;
-      for (const e of emissives.get(h.root)!) {
-        e.mat.emissive.copy(e.base).lerp(glow, l * (h.record !== undefined ? 0.06 : 0.14));
-        e.mat.emissiveIntensity = l > 0 ? Math.max(e.baseI, 1) : e.baseI;
-      }
-      if (h.record !== undefined) {
-        // Pulled forward and up off the ledge, as if to look at it.
-        h.root.position.y = h.root.userData.baseY + l * 0.05;
-        h.root.position.z = 0.075 + l * 0.03;
-        h.root.rotation.x = h.root.userData.baseRx * (1 - l * 0.6);
-        renderer.shadowMap.needsUpdate = true;
-      }
+      applyLift(h, next);
     }
     if (tipFor) placeTip(tipFor);
     placeDots();
 
-    if (!options.reducedMotion) turntable.spin.rotation.y -= dt * ((33.3 / 60) * Math.PI * 2);
+    // Tweens (the record, the arm, the platter's speed) first, then the models.
+    for (const tw of tweens) {
+      tw.t += dt;
+      const e = Math.min(tw.t / tw.dur, 1);
+      tw.fn(e);
+      if (e >= 1) {
+        tweens.delete(tw);
+        tw.done();
+      }
+    }
+    // The platter turns at 33 1/3 times its speed.
+    if (!options.reducedMotion) spinAngle += dt * RPM * spinSpeed;
+    turntable.spin.position.copy(disc.p);
+    turntable.spin.quaternion.copy(disc.q).multiply(qSpin.setFromAxisAngle(Y_AXIS, -spinAngle));
+    turntable.arm.rotation.y = armYaw;
+    turntable.arm.position.y = armHomeY + armLift;
+
+    // Small life: dust in the light, the big plant stirring.
+    if (!options.reducedMotion) {
+      moteDrift(time);
+      plant.rotation.z = Math.sin(time * 0.9) * 0.006 + Math.sin(time * 1.7 + 2) * 0.003;
+      plant.rotation.x = Math.sin(time * 0.7 + 1) * 0.005;
+    }
     renderer.render(scene, camera);
     if (!readyCalled) {
       readyCalled = true;
       options.onReady?.();
     }
 
-    const settling = moving || lean.distanceTo(leanTo) > 0.001;
+    const settling = moving || tweens.size > 0 || lean.distanceTo(leanTo) > 0.001;
     if (visible && (!options.reducedMotion || settling)) requestAnimationFrame(frame);
     else running = false;
   }
@@ -1559,12 +2366,16 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     requestAnimationFrame(frame);
   }
 
-  // A click on a sleeve opens the album, same as the list below.
-  stage.addEventListener('click', () => {
-    if (disposed) return;
+  // A click on a sleeve puts the record on; on the turntable, starts or
+  // stops it. (The album opens from the caption, and from the lists.)
+  stage.addEventListener('click', (e) => {
+    if (disposed || (e.target as Element).closest('.room-now')) return;
     const h = pick();
-    const url = h?.record !== undefined ? recordInfo[h.record]?.url : undefined;
-    if (url) window.open(url, '_self');
+    if (!h) return;
+    if (h.record !== undefined) {
+      const i = h.record;
+      void act(() => choose(i));
+    } else if (h.key === 'turntable') toggleTurntable();
   });
 
   const viewWatch = new IntersectionObserver((entries) => {
@@ -1576,6 +2387,7 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
   stage.append(renderer.domElement);
   resize();
   setMood();
+  for (const h of hoverables) if (h.record === held) applyLift(h, 0.45);
 
   // Takes the room down again (the page gives up on a room that loads too
   // slowly, and must not let it appear later).
@@ -1586,11 +2398,29 @@ export function mountRoom(stage: HTMLElement, options: RoomOptions) {
     if (!options.mood) dark.removeEventListener('change', setMood);
     renderer.domElement.remove();
     tip.remove();
+    now.remove();
     dots.remove();
+    tweens.clear();
+    moteGeo.dispose();
+    moteMat.dispose();
     stage.style.cursor = '';
     pmrem.dispose();
     renderer.dispose();
     renderer.forceContextLoss();
   }
-  return { renderer, scene, camera, dispose };
+  // For the lab page: play or stop a record without a click.
+  const api = {
+    play: (i: number) => act(() => choose(i)),
+    stop: () => act(async () => void (playing && (await stopPlayback()))),
+    /** For playing the record only once something else is ready (e.g. a music player has started). */
+    setPlayGate: (gate: () => Promise<unknown>) => void (playGate = gate),
+    /** Lab only: freeze the sequence for a record `sec` seconds in. */
+    seek,
+  };
+  // Ambient occlusion baked offline (npm run bake), applied once the scene is
+  // complete. Without bake files, or for models changed since, the room
+  // simply keeps its live lighting.
+  void applyBake(scene).then((r) => r && !disposed && requestRender());
+
+  return { renderer, scene, camera, dispose, ...api };
 }

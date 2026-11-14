@@ -149,7 +149,19 @@ function legendTexture(w: number, h: number, ppm: number, draw: (g: CanvasRender
 
 // ---------------------------------------------------------------- model
 
-export function buildTurntable(cover: THREE.Texture): { group: THREE.Group; spin: THREE.Object3D } {
+export interface Turntable {
+  group: THREE.Group;
+  /** The record on the platter; turn it about y. */
+  spin: THREE.Object3D;
+  /** The tonearm, pivoting about y at its base; rest is rotation 0, y 0. */
+  arm: THREE.Object3D;
+  /** The arm's rotation.y that puts the stylus over the groove. */
+  armPlay: number;
+  /** Changes the label on the record. */
+  setLabel(tex: THREE.Texture): void;
+}
+
+export function buildTurntable(cover: THREE.Texture): Turntable {
   const g = new THREE.Group();
 
   // Dimensions (m).
@@ -373,6 +385,7 @@ export function buildTurntable(cover: THREE.Texture): { group: THREE.Group; spin
     g.add(mat);
   }
 
+  let labelMat!: THREE.MeshStandardMaterial;
   const spin = new THREE.Group();
   spin.position.set(PX, PLATTER_TOP + 0.002, PZ);
   {
@@ -391,10 +404,26 @@ export function buildTurntable(cover: THREE.Texture): { group: THREE.Group; spin
     const record = mesh(new THREE.CylinderGeometry(REC_R, REC_R, recH, 160, 1), [edgeMat, vinylMat, edgeMat]);
     record.position.y = recH / 2;
     spin.add(record);
-    const label = mesh(new THREE.CircleGeometry(LABEL_R, 72), new THREE.MeshStandardMaterial({ map: cover, roughness: 0.55 }));
+    labelMat = new THREE.MeshStandardMaterial({ map: cover, roughness: 0.55 });
+    // The label is a ring: the spindle hole is a real hole, so the record can
+    // be seen to line up with the spindle as it is lowered onto it.
+    const HOLE = 0.0039;
+    const label = mesh(new THREE.RingGeometry(HOLE, LABEL_R, 72), labelMat);
     label.rotation.x = -Math.PI / 2;
     label.position.y = recH + 0.0002;
     spin.add(label);
+    const holeMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
+    const holeTop = mesh(new THREE.CircleGeometry(HOLE + 0.0003, 20), holeMat, false);
+    holeTop.rotation.x = -Math.PI / 2;
+    holeTop.position.y = recH + 0.0001;
+    spin.add(holeTop);
+    const holeBottom = mesh(new THREE.CircleGeometry(HOLE + 0.0003, 20), holeMat, false);
+    holeBottom.rotation.x = Math.PI / 2;
+    holeBottom.position.y = -0.0001;
+    spin.add(holeBottom);
+  }
+  // The spindle stays on the platter, whatever record is on it.
+  {
     const spindle = mesh(
       merge([
         place(cylg(0.0036, 0.0036, 0.017, 16), [0, 0.0055, 0]),
@@ -402,19 +431,29 @@ export function buildTurntable(cover: THREE.Texture): { group: THREE.Group; spin
       ]),
       chrome,
     );
-    spin.add(spindle);
+    spindle.position.copy(spin.position);
+    g.add(spindle);
   }
   g.add(spin);
 
   // ---- Tonearm: straight aluminium tube on a black gimbal over a round
   // base plate, black counterweight, black headshell, cartridge with a
   // silver nameplate, silver finger lift.
+  const arm = new THREE.Group();
+  let armPlay = 0;
   {
     const ARM_Y = TOP + 0.033;
     const pivot = new THREE.Vector3(0.128, ARM_Y, -0.108);
     const tip = new THREE.Vector3(0.152, ARM_Y - 0.002, 0.07);
     const dir = tip.clone().sub(pivot).setY(0).normalize();
     const yaw = Math.atan2(dir.x, dir.z);
+    // The moving parts hang off a group at the pivot, so the arm can swing.
+    arm.position.copy(pivot);
+    g.add(arm);
+    const armAdd = (o: THREE.Object3D) => {
+      o.position.sub(pivot);
+      arm.add(o);
+    };
 
     // Base plate and gimbal housing.
     g.add(
@@ -435,16 +474,16 @@ export function buildTurntable(cover: THREE.Texture): { group: THREE.Group; spin
     );
     gimbal.position.copy(pivot);
     gimbal.rotation.y = yaw;
-    g.add(gimbal);
+    armAdd(gimbal);
 
     // Tube, from the stub behind the gimbal to the headshell.
     const tail = pivot.clone().addScaledVector(dir, -0.03);
-    g.add(mesh(merge([rod(tail, tip, 0.0034, 14)]), silver));
+    armAdd(mesh(merge([rod(tail, tip, 0.0034, 14)]), silver));
 
     // Counterweight: black barrel with a fine front ring.
     const cwA = pivot.clone().addScaledVector(dir, -0.022);
     const cwB = pivot.clone().addScaledVector(dir, -0.05);
-    g.add(
+    armAdd(
       mesh(
         merge([rod(cwA, cwB, 0.014, 32), rod(cwB, cwB.clone().addScaledVector(dir, -0.002), 0.014, 32, 0.0125)]),
         std(0x111112, 0.35, 0.4),
@@ -503,7 +542,25 @@ export function buildTurntable(cover: THREE.Texture): { group: THREE.Group; spin
       head.add(mesh(new THREE.TubeGeometry(fl, 12, 0.0008, 6, false), silver, false));
       head.add(mesh(place(cylg(0.0004, 0.0002, 0.003, 6), [0, -0.0185, 0.034]), chrome, false));
     }
-    g.add(head);
+    armAdd(head);
+
+    // Where the stylus lands: swing the arm in until it is over the record,
+    // a third of the way from the rim to the label.
+    {
+      const stylus = new THREE.Vector2(
+        tip.x + Math.sin(head.rotation.y) * 0.034 - pivot.x,
+        tip.z + Math.cos(head.rotation.y) * 0.034 - pivot.z,
+      );
+      const goal = LABEL_R + (REC_R - LABEL_R) * 0.62;
+      for (let a = 0; a > -1.2; a -= 0.002) {
+        const c = Math.cos(a);
+        const s = Math.sin(a);
+        const x = pivot.x + stylus.x * c + stylus.y * s;
+        const z = pivot.z - stylus.x * s + stylus.y * c;
+        armPlay = a;
+        if (Math.hypot(x - PX, z - PZ) < goal) break;
+      }
+    }
 
     // Arm rest: black post with a clip that holds the tube.
     const rz = 0.04;
@@ -527,8 +584,8 @@ export function buildTurntable(cover: THREE.Texture): { group: THREE.Group; spin
     g.add(
       mesh(
         merge([
-          place(cylg(0.004, 0.005, ARM_Y - TOP - 0.008, 14), [lp.x + 0.012, (ARM_Y + TOP - 0.008) / 2, lp.z]),
-          place(rbox(0.026, 0.003, 0.007, 0.001), [lp.x + 0.002, ARM_Y - 0.0065, lp.z]),
+          place(cylg(0.004, 0.005, ARM_Y - TOP - 0.008, 14), [lp.x + 0.013, (ARM_Y + TOP - 0.008) / 2, lp.z]),
+          place(rbox(0.02, 0.003, 0.007, 0.001), [lp.x + 0.007, ARM_Y - 0.0065, lp.z]),
         ]),
         darkPlastic,
       ),
@@ -627,5 +684,5 @@ export function buildTurntable(cover: THREE.Texture): { group: THREE.Group; spin
     g.add(lid);
   }
 
-  return { group: g, spin };
+  return { group: g, spin, arm, armPlay, setLabel: (tex) => ((labelMat.map = tex), (labelMat.needsUpdate = true)) };
 }

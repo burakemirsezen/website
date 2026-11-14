@@ -5,7 +5,14 @@
 //   /lab?model=guitar&yaw=30&pitch=10&zoom=1     one model on a studio set
 //   /lab?model=room&mood=day                     the whole room as on the site
 //                                                (mood: day or night; default
-//                                                follows the colour scheme)
+//                                                follows the colour scheme;
+//                                                hour=17.5 lights it for that
+//                                                time in Zurich; play=2 puts
+//                                                record 3 on, with motion on;
+//                                                seek=2:1.4 freezes that
+//                                                sequence 1.4 s in;
+//                                                bake=1 applies the lighting
+//                                                bake, see README)
 //
 // Models: guitar, amp, interface, turntable, speaker, room.
 // window.__labReady becomes true once the frame is rendered.
@@ -49,6 +56,7 @@ const gear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, te
       import { buildTurntable } from '../scripts/room/turntable';
       import { buildSpeaker } from '../scripts/room/speakers';
       import { mountRoom } from '../scripts/room/scene';
+      import { applyBake } from '../scripts/room/lightbake';
 
       const q = new URLSearchParams(location.search);
       const which = q.get('model') ?? 'guitar';
@@ -58,13 +66,33 @@ const gear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, te
       if (which === 'room') {
         const mood = q.get('mood');
         // Kept on window so the renderer's stats can be read (renderer.info).
-        (window as any).__room = mountRoom(stage, {
+        const hour = q.get('hour');
+        const room = mountRoom(stage, {
+          hour: hour === null ? undefined : Number(hour),
           covers,
           reducedMotion: q.get('motion') !== 'on',
           mood: mood === 'day' || mood === 'night' ? mood : undefined,
           records: JSON.parse(stage.dataset.records ?? '[]'),
           gear: JSON.parse(stage.dataset.gear ?? '{}'),
         });
+        (window as any).__room = room;
+        // bake=1 applies the precomputed occlusion (src/assets/bake); bake=0.5 at half strength.
+        const bake = q.get('bake');
+        if (bake !== null && Number(bake) > 0) {
+          void applyBake(room.scene, { intensity: Number(bake) }).then((r) => {
+            console.info('bake applied', r);
+            // Wake the on-demand render loop.
+            stage.dispatchEvent(new Event('pointerleave'));
+          });
+        }
+        const play = q.get('play');
+        if (play !== null) void room.play(Number(play));
+        // seek=2:1.4 freezes the put-the-record-on sequence for record 3 at 1.4 s.
+        const seek = q.get('seek');
+        if (seek !== null) {
+          const [i, sec] = seek.split(':').map(Number);
+          (window as any).__pose = room.seek(i, sec);
+        }
         setTimeout(() => ((window as any).__labReady = true), 2500);
       } else {
         const cover = new THREE.TextureLoader().load(covers[0]);

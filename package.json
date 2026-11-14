@@ -6,11 +6,15 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "bake": "node scripts/bake.mjs"
   },
   "dependencies": {
     "@fontsource-variable/public-sans": "^5.3.0",
     "astro": "^5.18.2",
     "three": "0.181.0"
+  },
+  "devDependencies": {
+    "three-mesh-bvh": "^0.9.18"
   }
 }

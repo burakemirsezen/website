@@ -693,8 +693,9 @@ export function buildGuitar(): THREE.Group {
     bumpMap: alder,
     bumpScale: 0.4,
     roughness: 0.52,
-    clearcoat: 0.25,
-    clearcoatRoughness: 0.55,
+    // Satin finish: a thin clearcoat that sheens but never mirrors.
+    clearcoat: 0.45,
+    clearcoatRoughness: 0.42,
   });
   const mapleTex = mapleTexture();
   mapleTex.repeat.set(1, 1);
@@ -834,7 +835,7 @@ export function buildGuitar(): THREE.Group {
   }
 
   // Vintage-style tremolo: plate with the arm tab, six bent-steel saddles,
-  // pivot screws, intonation screws and springs, and the arm itself.
+  // pivot screws, intonation screws and springs. No arm is fitted.
   {
     const front = 0.1418, back = 0.1015, w = 0.071;
     chromeG.push(at(new RoundedBoxGeometry(w, front - back, 0.0022, 2, 0.0008), -0.0015, (front + back) / 2, ZF + 0.0011));
@@ -859,15 +860,6 @@ export function buildGuitar(): THREE.Group {
       chromeG.push(rod(new THREE.Vector3(x, ya, bottom + 0.0028), new THREE.Vector3(x, yb, bottom + 0.0028), 0.0011, 8));
       nickelG.push(rod(new THREE.Vector3(x, ya - 0.0003, bottom + 0.0028), new THREE.Vector3(x, ya - 0.0055, bottom + 0.0028), 0.0019, 8));
     }
-    // The arm: screwed into the treble tab, bent up and swung along the strings.
-    const a0 = new THREE.Vector3(0.0335, 0.1116, ZF + 0.003);
-    const a1 = new THREE.Vector3(0.0335, 0.1116, ZF + 0.011);
-    const a2 = new THREE.Vector3(0.0352, 0.124, ZF + 0.0165);
-    const a3 = new THREE.Vector3(0.0478, 0.232, ZF + 0.0175);
-    const a4 = new THREE.Vector3(0.0498, 0.262, ZF + 0.0175);
-    chromeG.push(rod(a0, a1, 0.0026, 12), rod(a1, a2, 0.0025, 12), rod(a2, a3, 0.0025, 12));
-    chromeG.push(at(new THREE.SphereGeometry(0.0025, 10, 6), a1.x, a1.y, a1.z), at(new THREE.SphereGeometry(0.0025, 10, 6), a2.x, a2.y, a2.z));
-    whiteG.push(rod(a3, a4, 0.0036, 14), at(new THREE.SphereGeometry(0.0036, 12, 8), a4.x, a4.y, a4.z));
   }
 
   // Controls: chrome dome knobs on the body, 5-way lever on the guard.

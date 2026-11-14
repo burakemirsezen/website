@@ -30,7 +30,7 @@ try {
       `--window-size=${width},${height}`,
       '--virtual-time-budget=8000',
       `--screenshot=${resolve(out)}`,
-      `http://localhost:4321/lab?${query}`,
+      `${process.env.LAB_URL ?? "http://localhost:4321"}/lab/?${query}`,
     ],
     { stdio: 'ignore' },
   );

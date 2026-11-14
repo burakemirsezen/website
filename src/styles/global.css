@@ -142,7 +142,7 @@ a:hover {
 
 a:focus-visible,
 summary:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--link);
   outline-offset: 3px;
   border-radius: 2px;
 }
@@ -263,6 +263,9 @@ summary:focus-visible {
   font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
+  /* The signal underline grows in from the left. */
+  background: linear-gradient(var(--signal), var(--signal)) 0 calc(100% - 0.5rem) / 0 2px no-repeat;
+  transition: background-size 280ms var(--ease);
 }
 
 /* Hover and the section in view both keep the cream text (the highest
@@ -270,8 +273,7 @@ summary:focus-visible {
    would lower its contrast on hover, the opposite of what hover should do. */
 .top a:hover,
 .top a[aria-current] {
-  text-decoration: underline 2px var(--signal);
-  text-underline-offset: 0.35em;
+  background-size: 100% 2px;
 }
 
 .top .top-contact {
@@ -314,7 +316,6 @@ h1 {
   font-weight: 800;
   line-height: 0.86;
   letter-spacing: -0.045em;
-  animation: rise 700ms var(--ease) both;
 }
 
 h1 span {
@@ -499,11 +500,13 @@ h1 span {
     0 1px 2px rgb(20 14 8 / 0.25),
     0 18px 40px -12px rgb(20 14 8 / 0.45),
     0 40px 80px -30px rgb(20 14 8 / 0.5);
-  transition: transform 500ms var(--ease);
+  /* --tx, --ty and --lift are set by the pointer (src/scripts/fx.ts). */
+  transform: perspective(1200px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg)) translateY(var(--lift, 0px));
+  transition: transform 450ms var(--ease);
 }
 
 .shot:hover {
-  transform: translateY(-6px);
+  --lift: -6px;
 }
 
 /* Accent ring with a dark band inside it, so it shows on the light ground,
@@ -1112,8 +1115,13 @@ h1 span {
   display: none;
 }
 
-.room-stage.has-gl ~ .music-list .gear [data-room-only] {
-  display: block;
+/* Only while the lists are visually hidden behind the room (desktop, room
+   up, no keyboard focus inside): a narrower window hides the room and shows
+   the lists again, where this photo-less item would leave an empty slot. */
+@media (min-width: 60.0625rem) {
+  .room-stage.has-gl ~ .music-list:not(:focus-within) .gear [data-room-only] {
+    display: block;
+  }
 }
 
 /* An empty photo or cover slot. */
@@ -1514,8 +1522,53 @@ h1 span {
 }
 
 /* Hover turns the line orange-on-cream solid: the underline thickens. */
+.foot-mail a {
+  transition: color 200ms var(--ease);
+}
+
 .foot-mail a:hover {
+  color: var(--signal);
   text-decoration-thickness: 0.12em;
+}
+
+/* The same short ember bar as under the name, so the page ends as it began. */
+.foot-cta::before {
+  content: '';
+  display: block;
+  width: 3.5rem;
+  height: 6px;
+  margin-bottom: var(--space-m);
+  background: var(--signal);
+}
+
+.foot-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs) var(--space-m);
+  margin-top: var(--space-xl);
+}
+
+.foot-end .foot-build {
+  margin-top: 0;
+}
+
+.foot-top {
+  padding-block: 0.6rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.foot-top::after {
+  content: ' \2191';
+  display: inline-block;
+  transition: translate 200ms var(--ease);
+}
+
+.foot-top:hover::after {
+  translate: 0 -0.2em;
 }
 
 .foot-links {
@@ -1657,13 +1710,15 @@ h1 span {
     scroll-behavior: auto;
   }
 
-  h1,
   .chain.live li + li::before,
   .chain.live.lit li {
     animation: none;
   }
 
   .btn,
+  .top a,
+  .foot-mail a,
+  .foot-top::after,
   .top .top-contact,
   .shot,
   .room-tip,
@@ -1675,6 +1730,163 @@ h1 span {
   .go::after,
   .listen::after {
     transition: none;
+  }
+}
+
+/* Page-wide polish: grain, entrance choreography and scroll-linked effects.
+   Everything that moves sits in no-preference, so reduced motion gets the
+   finished page. Scroll-driven animation is Chromium (and newer Safari) only;
+   elsewhere the page is simply static, which is the intended fallback. */
+
+/* A fine paper grain on the hero and footer bands: a 160px tile of SVG noise
+   (about 400 bytes) in light grain at 6%, so charcoal reads as a printed
+   surface instead of a flat fill. */
+.hero::before,
+.foot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.hero,
+.foot {
+  position: relative;
+}
+
+.hero > .wrap,
+.foot > .wrap {
+  position: relative;
+  z-index: 1;
+}
+
+/* An ember tab on each section rule, the same mark as under the name. */
+.plain .wrap::after,
+.visit::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--pad);
+  width: 3.5rem;
+  height: 6px;
+  background: var(--signal);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The name sets line by line, the rule draws, the rest follows. */
+  h1 span {
+    animation: rise 800ms var(--ease) both;
+  }
+
+  h1 span:nth-child(2) {
+    animation-delay: 140ms;
+  }
+
+  .masthead::after {
+    transform-origin: left;
+    animation: draw 700ms 480ms var(--ease) both;
+  }
+
+  .masthead .portrait-fig {
+    animation: fade-up 900ms 260ms var(--ease) both;
+  }
+
+  .summary,
+  .actions,
+  .now {
+    animation: fade-up 800ms var(--ease) both;
+  }
+
+  .summary {
+    animation-delay: 560ms;
+  }
+
+  .actions {
+    animation-delay: 680ms;
+  }
+
+  .now {
+    animation-delay: 760ms;
+  }
+
+  @keyframes draw {
+    from {
+      transform: scaleX(0);
+    }
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      translate: 0 1rem;
+    }
+  }
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      translate: 0 1.75rem;
+    }
+  }
+
+  @keyframes drift {
+    from {
+      translate: 0 2.5rem;
+    }
+    to {
+      translate: 0 -2.5rem;
+    }
+  }
+
+  @keyframes progress {
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  @supports (animation-timeline: view()) {
+    /* Entries and blocks rise into place as they enter the window. */
+    .entry,
+    .skills > div,
+    .showcase-text,
+    .visit-text,
+    .visit-shot {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+
+    /* Section rules draw in from the left. */
+    .plain .wrap::before,
+    .visit::before {
+      transform-origin: left;
+      animation: draw linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+    }
+
+    /* The second screenshot drifts a little against the first. */
+    .shot-2 {
+      animation: drift linear both;
+      animation-timeline: view();
+      animation-range: cover;
+    }
+
+    /* A thin signal line along the nav shows how far down the page you are. */
+    .top::after {
+      content: '';
+      position: absolute;
+      inset: auto 0 0;
+      height: 2px;
+      background: var(--signal);
+      transform: scaleX(0);
+      transform-origin: left;
+      animation: progress linear both;
+      animation-timeline: scroll(root);
+    }
   }
 }
 
@@ -1707,6 +1919,13 @@ h1 span {
 
   .hero {
     padding-block: 0 var(--space-xl);
+  }
+
+  .hero::before,
+  .foot::before,
+  .plain .wrap::after,
+  .visit::after {
+    display: none;
   }
 
   .skip,

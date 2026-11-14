@@ -384,6 +384,7 @@ export function buildAmp(): THREE.Group {
     new THREE.SphereGeometry(0.0014, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2),
     new THREE.MeshStandardMaterial({ color: 0xff2a1a, emissive: 0xff2010, emissiveIntensity: 1.6, roughness: 0.3 }),
   );
+  led.name = 'led-power';
   led.position.set(0.091, TOP, KZ + 0.0085);
   g.add(led);
 

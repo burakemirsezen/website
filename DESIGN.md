@@ -317,6 +317,10 @@ A product cut-out photo on a faint ink-tinted square tile (7% ink), so dark gear
 ### Placeholder slot
 A missing photo shows as a dashed muted border over a fine diagonal hatch, with a plain label. Unwritten text is italic with a dashed underline. Placeholders are meant to look unfinished.
 
+### Motion and texture
+
+The hero sets line by line, the ember rule draws in, then the summary, buttons and "Right now" rise. Below, entries and blocks reveal and section rules draw as they enter (CSS scroll-driven animation, static where unsupported), a thin ember line in the nav tracks scroll, and the nav underline grows in. Screenshots tilt a few degrees toward the pointer (`src/scripts/fx.ts`, mouse only). The hero and footer carry a 6% SVG paper grain. A short ember tab marks every section rule and the footer, echoing the rule under the name. All motion is off under `prefers-reduced-motion`. Focus rings use the link colour.
+
 ### Print
 Recruiters save pages as PDF, so print is designed, not left to chance. Print always uses the light palette on white, whatever the screen theme. The bands drop their fill and their light text switches to ink. The nav, skip link, second screenshot and Spotify links are hidden. Buttons and footer links print as text followed by their address, and research links print their address in brackets. The portrait is capped at 20rem. The cluster facts behind the disclosure print even when it is closed. Entries, fact rows, chains, figures and screenshots never split across pages, and headings stay with what follows them. Page margins are 16mm by 14mm.
 

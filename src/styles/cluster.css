@@ -1,0 +1,164 @@
+/* Live panel in the cluster section. Hidden until the pod has answered. */
+
+.live-panel {
+  margin-top: var(--space-xl);
+  padding: var(--space-m);
+  border: 1px solid var(--band-line);
+  border-radius: 0.75rem;
+  background: #2a2724;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-m) var(--space-m);
+}
+
+.live-panel[hidden] {
+  display: none;
+}
+
+.live-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--on-band-soft);
+  font-size: 0.9375rem;
+}
+
+.live-head h3 {
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--on-band);
+}
+
+/* The heartbeat: one ember pulse per answer from the pod. */
+.live-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--signal);
+  flex: none;
+}
+
+.live-panel.stale .live-dot {
+  background: var(--on-band-soft);
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .live-panel.beat .live-dot {
+    animation: live-beat 900ms var(--ease);
+  }
+}
+
+@keyframes live-beat {
+  from {
+    box-shadow: 0 0 0 0 rgb(232 105 58 / 0.6);
+  }
+  to {
+    box-shadow: 0 0 0 0.6rem rgb(232 105 58 / 0);
+  }
+}
+
+.live-cell[hidden] {
+  display: none;
+}
+
+.live-cell dt {
+  color: var(--on-band-soft);
+  font-size: 0.875rem;
+}
+
+.live-cell dd {
+  margin-top: 0.2rem;
+  font-size: 1.375rem;
+  font-weight: 650;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* The pod's name is a long identifier, so it is set smaller and in mono. */
+.live-cell.pod dd {
+  font-family: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 1rem;
+  font-weight: 500;
+  padding-block: 0.2rem;
+}
+
+.live-cell small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--on-band-soft);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.live-rtt {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-m);
+  padding-top: var(--space-s);
+  border-top: 1px solid var(--band-line);
+}
+
+.live-spark {
+  display: block;
+  width: 100%;
+  height: 3rem;
+  color: var(--signal);
+  overflow: visible;
+}
+
+.live-spark polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.live-spark circle {
+  fill: currentColor;
+}
+
+.live-spark line {
+  stroke: var(--band-line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.live-rtt .live-cell {
+  text-align: right;
+}
+
+@media (max-width: 44rem) {
+  .live-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: var(--space-s);
+  }
+
+  .live-cell.pod {
+    grid-column: 1 / -1;
+  }
+
+  .live-rtt {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xs);
+  }
+
+  .live-rtt .live-cell {
+    order: -1;
+    text-align: left;
+  }
+}
+
+.live-panel dl {
+  display: contents;
+}
+
+.live-rtt dl {
+  display: block;
+}
