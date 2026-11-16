@@ -3,16 +3,13 @@
 // screenshots while modelling. Delete before shipping.
 //
 //   /lab?model=guitar&yaw=30&pitch=10&zoom=1     one model on a studio set
-//   /lab?model=room&mood=day                     the whole room as on the site
-//                                                (mood: day or night; default
-//                                                follows the colour scheme;
-//                                                hour=17.5 lights it for that
-//                                                time in Zurich; play=2 puts
-//                                                record 3 on, with motion on;
-//                                                seek=2:1.4 freezes that
-//                                                sequence 1.4 s in;
-//                                                bake=1 applies the lighting
-//                                                bake, see README)
+//   /lab?model=room&mood=day                     the room as on the site: the
+//                                                rendered plate plus the live
+//                                                overlay (mood: day or night;
+//                                                default follows the colour
+//                                                scheme; play=2 puts record 3
+//                                                on, with motion=on; seek=2:1.4
+//                                                freezes that sequence 1.4 s in)
 //
 // Models: guitar, amp, interface, turntable, speaker, room.
 // window.__labReady becomes true once the frame is rendered.
@@ -56,6 +53,25 @@ const gear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, te
       .room {
         display: none;
       }
+      #stage :global(.room-plate) {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+        pointer-events: none;
+        z-index: 0;
+      }
+      #stage :global(.room-canvas) {
+        position: relative;
+        z-index: 1;
+        display: block;
+      }
+      #stage :global(.room-tip),
+      #stage :global(.room-dots),
+      #stage :global(.room-now) {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -67,8 +83,7 @@ const gear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, te
       import { buildInterface } from '../scripts/room/interface';
       import { buildTurntable } from '../scripts/room/turntable';
       import { buildSpeaker } from '../scripts/room/speakers';
-      import { mountRoom } from '../scripts/room/scene';
-      import { applyBake } from '../scripts/room/lightbake';
+      import { mountPlateRoom } from '../scripts/room/plate-room';
 
       const q = new URLSearchParams(location.search);
       const which = q.get('model') ?? 'guitar';
@@ -79,24 +94,18 @@ const gear = JSON.stringify(Object.fromEntries(music.photos.map(({ id, title, te
         const mood = q.get('mood');
         // Kept on window so the renderer's stats can be read (renderer.info).
         const hour = q.get('hour');
-        const room = mountRoom(stage, {
+        const records = JSON.parse(stage.dataset.records ?? '[]');
+        const gear = JSON.parse(stage.dataset.gear ?? '{}');
+
+        const room = mountPlateRoom(stage, {
           hour: hour === null ? undefined : Number(hour),
           covers,
           reducedMotion: q.get('motion') !== 'on',
           mood: mood === 'day' || mood === 'night' ? mood : undefined,
-          records: JSON.parse(stage.dataset.records ?? '[]'),
-          gear: JSON.parse(stage.dataset.gear ?? '{}'),
+          records,
+          gear,
         });
         (window as any).__room = room;
-        // bake=1 applies the precomputed occlusion (src/assets/bake); bake=0.5 at half strength.
-        const bake = q.get('bake');
-        if (bake !== null && Number(bake) > 0) {
-          void applyBake(room.scene, { intensity: Number(bake) }).then((r) => {
-            console.info('bake applied', r);
-            // Wake the on-demand render loop.
-            stage.dispatchEvent(new Event('pointerleave'));
-          });
-        }
         const play = q.get('play');
         if (play !== null) void room.play(Number(play));
         // seek=2:1.4 freezes the put-the-record-on sequence for record 3 at 1.4 s.

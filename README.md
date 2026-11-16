@@ -64,32 +64,42 @@ becomes a link to that commit.
 - The cluster section names the stack but no hostnames or addresses. Keep it
   that way.
 
-## The listening room's baked lighting
+## The listening room
 
-The 3D room has ambient occlusion (contact shadows, darker corners) that is
-computed once, offline, and only sampled at runtime. It is mood independent, so
-one bake serves day and night. The files are in `src/assets/bake/` (about
-0.6 MB): an atlas for the large flat faces (floor, walls, ceiling, rug) and one
-byte per vertex for everything else. If they are missing, or a model no longer
-matches them, the room simply looks as it did without them (the browser console
-says once that a re-bake is due).
+The room in the Music section is a still image rendered offline in Blender
+Cycles (one for day, one for night) with a small live layer on top: the record,
+the tonearm and the hover outlines of the gear, drawn by three.js in
+`src/scripts/room/plate-room.ts` from the gear models next to it. The images,
+the light probe and shadow the live layer is lit with, and `plate-meta.json`
+(camera, gear positions, light) are committed in `src/assets/bake/`.
 
-Re-bake after changing any model or its placement in `src/scripts/room/`:
+The room itself is a Blender file, `bake-assets/master/room.blend` (git-ignored,
+about 1.6 GB with every texture packed). Day and night are one scene; what
+differs between them (lamp bulbs, the lit windows across the street, the sky)
+is a small table stored in the file. Edit the file, then:
 
 ```
-npm run bake                  # needs Chrome or Edge and a real GPU; about a minute
+npm run room:backup           # before a big edit: copies it to the backup share
+npm run room:check            # objects passing through each other, new since the baseline
+npm run bake:plates -- --preset draft   # a quick look (about 3 minutes for both moods)
+npm run bake:plates           # final, 3840x2160 (-- --preset ultra for the slow, cleanest one)
 git add src/assets/bake
 ```
 
-`npm run bake` starts its own dev server on port 4329, runs `/bake` in headless
-Chrome on the GPU, writes the files and stops again. It refuses to run on a
-software renderer unless you pass `--allow-software`. Options:
-`-- --spp 1024` (rays per sample, default 512), `--density 160` (atlas texels
-per metre), `--dist 0.9` (occluder reach in metres), `--strength 1.4`,
-`--min 0.3` (AO never darker than this). To use a visible browser instead,
-run `npm run dev`, open `http://localhost:4321/bake` and press Bake.
-`/lab/?model=room&bake=1` shows the room with the bake applied. The bake page
-and its code are removed from the production build.
+- `room:backup -- --list` lists the backups and `-- --restore <name>` brings
+  one back. They are copied over SSH to the host and folder named in
+  `bake-assets/backup.json` (local, not committed; see `scripts/room.mjs`).
+- `room:check` compares against `scripts/blender/clip-baseline.json`, the
+  intersections of the reviewed scene (most are parts of one object built to
+  overlap). `-- --write-baseline` accepts the current state.
+- The turntable, guitar, amp, interface and speakers are locked in the file:
+  the live layer draws on top of them at the positions in the code, so a render
+  stops if one has moved. Change a gear model in code, and it has to be
+  replaced in the file to match.
+- `npm run plates:encode` re-encodes the WebP/AVIF variants from the 16-bit
+  masters without rendering. `/lab?model=room` shows the room as on the site;
+  `/lab?model=guitar` (amp, interface, turntable, speaker) one model on its own.
+  The lab page is removed from the production build.
 
 ## Release and deploy
 

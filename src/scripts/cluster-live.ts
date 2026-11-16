@@ -51,6 +51,9 @@ function traceFirstByte(): void {
 // Cloudflare answers /cdn-cgi/trace on every proxied site with the edge
 // location ("colo=ZRH"). Resolves to the code, or undefined without one.
 function traceEdge(): Promise<string | undefined> {
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    return Promise.resolve(undefined);
+  }
   const edge = document.querySelector<HTMLElement>('[data-hop="Cloudflare"]');
   return fetch('/cdn-cgi/trace')
     .then((r) => (r.ok ? r.text() : ''))

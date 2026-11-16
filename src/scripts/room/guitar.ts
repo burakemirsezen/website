@@ -9,7 +9,7 @@
 // Origin: the bottom strap button touches y = 0, centred; +y runs up the
 // neck, +z is the front of the guitar, z = 0 is the middle of the body.
 
-import { THREE, std, mesh, canvasTexture, RoundedBoxGeometry } from './kit';
+import { THREE, std, mesh, canvasTexture, RoundedBoxGeometry, sg, bq, bakeQuality, mottleMap, greyCanvas, normalFromHeight, dataTexture } from './kit';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 type V2 = [number, number];
@@ -77,6 +77,8 @@ const NUT_X = (i: number) => -0.01725 + i * 0.0069;
 const SAD_X = (i: number) => -0.02625 + i * 0.0105; // 10.5 mm spacing
 const GAUGE = [0.042, 0.032, 0.024, 0.016, 0.011, 0.009].map((g) => (g * 0.0254) / 2);
 const COMP = [0.0035, 0.0028, 0.0022, 0.003, 0.0015, 0];
+// Bake: the lay of the winding wire on E, A and D (core 0.016-0.010", wire ~0.33-0.18 mm).
+const WIRE_PITCH = [0.00033, 0.00025, 0.00018];
 const strX = (i: number, y: number) => {
   const t = (Y_NUT - y) / SCALE;
   return NUT_X(i) + (SAD_X(i) - NUT_X(i)) * t;
@@ -126,12 +128,12 @@ function along(g: G, from: THREE.Vector3, dir: THREE.Vector3): G {
 // A thin cylinder from a to b.
 function rod(a: THREE.Vector3, b: THREE.Vector3, r: number, seg = 6): G {
   const d = b.clone().sub(a);
-  const g = new THREE.CylinderGeometry(r, r, d.length(), seg, 1, true);
+  const g = new THREE.CylinderGeometry(r, r, d.length(), sg(seg), 1, true);
   g.translate(0, d.length() / 2, 0);
   return along(g, a, d);
 }
 function dome(r: number, h: number, seg = 12): G {
-  const g = new THREE.SphereGeometry(r, seg, 4, 0, Math.PI * 2, 0, Math.PI / 2);
+  const g = new THREE.SphereGeometry(r, sg(seg), sg(4), 0, Math.PI * 2, 0, Math.PI / 2);
   g.scale(1, h / r, 1);
   g.rotateX(Math.PI / 2); // dome faces +z
   return g;
@@ -189,13 +191,15 @@ function stadium(len: number, wid: number) {
   return s;
 }
 function lathe(profile: V2[], seg: number): G {
-  return new THREE.LatheGeometry(profile.map(([r, h]) => new THREE.Vector2(r, h)), seg);
+  return new THREE.LatheGeometry(profile.map(([r, h]) => new THREE.Vector2(r, h)), sg(seg));
 }
 
 // ---------------------------------------------------------------- textures
+let alderTex: THREE.Texture | undefined;
 function alderTexture() {
+  if (alderTex) return alderTex;
   const R = rng(11);
-  return canvasTexture(1024, 1024, (g) => {
+  return (alderTex = canvasTexture(1024, 1024, (g) => {
     g.fillStyle = '#c79d68';
     g.fillRect(0, 0, 1024, 1024);
     // Three-piece body: each board a touch different.
@@ -256,11 +260,51 @@ function alderTexture() {
       g.lineTo(s + 1.5, 1024);
       g.stroke();
     }
-  });
+    if (bakeQuality()) edgeWear(g);
+  }));
 }
+// Bake only: the finish rubbed through along the body's edge here and there,
+// as on a guitar that has lived on a stand (seeded, so it is the same every
+// bake). The roundover collapses onto the outline in the body's UVs, so a
+// stroke along the outline lands on the edge.
+function edgeWear(g: CanvasRenderingContext2D) {
+  const R = rng(77);
+  const pts = closedCurve(BODY_PTS, 900);
+  const px = (p: V2): V2 => [((p[0] + 0.18) / 0.36) * 1024, (1 - p[1] / 0.48) * 1024];
+  let i = 0;
+  while (i < pts.length) {
+    const run = 4 + Math.floor(R() * 26);
+    if (R() < 0.2) {
+      const a = 0.08 + R() * 0.22;
+      g.strokeStyle = `rgba(222 188 132 / ${a})`;
+      g.lineWidth = 0.8 + R() * 3.2;
+      g.lineCap = 'round';
+      g.beginPath();
+      for (let k = 0; k < run; k++) {
+        const [x, y] = px(pts[(i + k) % pts.length]);
+        if (k) g.lineTo(x, y);
+        else g.moveTo(x, y);
+      }
+      g.stroke();
+    }
+    i += run;
+  }
+  // A few tiny dings, lighter where the lacquer chipped.
+  for (let k = 0; k < 26; k++) {
+    const [x, y] = px(pts[Math.floor(R() * pts.length)]);
+    g.fillStyle = `rgba(232 204 150 / ${0.25 + R() * 0.3})`;
+    g.beginPath();
+    g.arc(x + (R() - 0.5) * 3, y + (R() - 0.5) * 3, 0.5 + R() * 1.3, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+let mapleTexCache: THREE.Texture | undefined;
 function mapleTexture() {
+  if (mapleTexCache) return mapleTexCache;
   const R = rng(5);
-  const t = canvasTexture(256, 1024, (g) => {
+  const K = bq(1, 2);
+  const t = canvasTexture(256 * K, 1024 * K, (g) => {
+    g.scale(K, K);
     g.fillStyle = '#e2c99d';
     g.fillRect(0, 0, 256, 1024);
     for (let k = 0; k < 140; k++) {
@@ -273,11 +317,15 @@ function mapleTexture() {
     }
   });
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  return t;
+  return (mapleTexCache = t);
 }
+let rosewoodTex: THREE.Texture | undefined;
 function rosewoodTexture() {
+  if (rosewoodTex) return rosewoodTex;
   const R = rng(3);
-  return canvasTexture(256, 1024, (g) => {
+  const K = bq(1, 2);
+  return (rosewoodTex = canvasTexture(256 * K, 1024 * K, (g) => {
+    g.scale(K, K);
     g.fillStyle = '#463a32';
     g.fillRect(0, 0, 256, 1024);
     for (let k = 0; k < 220; k++) {
@@ -293,15 +341,17 @@ function rosewoodTexture() {
       g.fillStyle = `rgba(15 6 2 / ${0.2 + R() * 0.4})`;
       g.fillRect(R() * 256, R() * 1024, 1, 2 + R() * 5);
     }
-  });
+  }));
 }
+let logoTex: THREE.Texture | undefined;
 function logoTexture() {
+  if (logoTex) return logoTex;
   // Headstock decal: covers x -0.034..0.056 and 0..0.195 above the nut;
   // drawn in metres with y up.
   const kx = 512 / 0.09, ky = 1024 / 0.195;
-  return canvasTexture(512, 1024, (g) => {
+  return (logoTex = canvasTexture(512, 1024, (g) => {
     g.clearRect(0, 0, 512, 1024);
-    g.setTransform(kx, 0, 0, -ky, 0.034 * kx, 0.195 * ky);
+    g.transform(kx, 0, 0, -ky, 0.034 * kx, 0.195 * ky);
     const ink = '#17130f';
     // Tuning-fork badge near the tip.
     const cx = 0.036, cy = 0.1665, r = 0.0093;
@@ -343,8 +393,234 @@ function logoTexture() {
     };
     text('PACIFICA', 0.0303, 0.081, 0.061, '600 12px "Century Gothic", "Futura", "Trebuchet MS", sans-serif');
     text('Yamaha Guitar Development', 0.0372, 0.0745, 0.048, '3.2px Arial, sans-serif');
-  });
+  }));
 }
+
+export function prewarmGuitarTextures(): (() => void)[] {
+  return [
+    () => {
+      alderTexture();
+    },
+    () => {
+      mapleTexture();
+      rosewoodTexture();
+      logoTexture();
+    },
+  ];
+}
+
+// ---------------------------------------------------------------- bake-only detail
+// Everything below is reached only when bakeQuality() is true (the path
+// tracer's still); the runtime build never calls it.
+
+// A soft round blob on a height canvas, repeated across the edges so tiles wrap.
+function wrapBlob(g: CanvasRenderingContext2D, x: number, y: number, r: number, w: number, h: number, inner: string) {
+  for (const ox of [-w, 0, w])
+    for (const oy of [-h, 0, h]) {
+      const cx = x + ox, cy = y + oy;
+      if (cx + r < 0 || cx - r > w || cy + r < 0 || cy - r > h) continue;
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gr.addColorStop(0, inner);
+      gr.addColorStop(1, 'rgba(128 128 128 / 0)');
+      g.fillStyle = gr;
+      g.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+}
+const tile = (t: THREE.Texture, rx: number, ry: number) => (t.repeat.set(rx, ry), t);
+
+// Orange peel: the faint dimpling of sprayed polyester, ~0.7 mm across.
+let peelTex: THREE.Texture | undefined;
+function orangePeel() {
+  if (peelTex) return peelTex;
+  const R = rng(21), N = 512;
+  const h = greyCanvas(N, N, (g) => {
+    g.fillStyle = '#808080';
+    g.fillRect(0, 0, N, N);
+    for (let k = 0; k < 2600; k++) wrapBlob(g, R() * N, R() * N, 7 + R() * 10, N, N, R() < 0.5 ? 'rgba(215 215 215 / 0.22)' : 'rgba(48 48 48 / 0.22)');
+  });
+  return (peelTex = tile(dataTexture(normalFromHeight(h, 1.3)), 22, 30)); // 16 mm tiles on the body's UVs
+}
+
+// Hand-buffed roughness over the whole body: blooms of polish, swirl
+// scratches, and a smoother patch where the forearm rests on the bass bout.
+function lacquerRough() {
+  const R = rng(33), N = 1024;
+  const c = greyCanvas(N, N, (g) => {
+    g.fillStyle = '#d9d9d9';
+    g.fillRect(0, 0, N, N);
+    for (let k = 0; k < 170; k++) {
+      const v = R() < 0.5 ? 160 : 255;
+      const x = R() * N, y = R() * N, r = 18 + R() * 90;
+      const gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, `rgba(${v} ${v} ${v} / 0.3)`);
+      gr.addColorStop(1, `rgba(${v} ${v} ${v} / 0)`);
+      g.fillStyle = gr;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    g.lineWidth = 0.5;
+    for (let k = 0; k < 1300; k++) {
+      const x = R() * N, y = R() * N, a = R() * Math.PI * 2, l = 6 + R() * 55;
+      const rough = R() < 0.65;
+      g.strokeStyle = rough ? `rgba(255 255 255 / ${0.08 + R() * 0.2})` : `rgba(120 120 120 / ${0.08 + R() * 0.15})`;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.quadraticCurveTo(x + Math.cos(a) * l * 0.5 + (R() - 0.5) * 8, y + Math.sin(a) * l * 0.5 + (R() - 0.5) * 8, x + Math.cos(a) * l, y + Math.sin(a) * l);
+      g.stroke();
+    }
+    // Forearm patch (bass side of the lower bout) and the belt-buckle zone on the back.
+    for (const [x, y, rx, ry, v] of [[176, 805, 70, 120, 165], [560, 560, 50, 70, 190]]) {
+      g.save();
+      g.translate(x, y);
+      g.scale(rx / ry, 1);
+      const gr = g.createRadialGradient(0, 0, 0, 0, 0, ry);
+      gr.addColorStop(0, `rgba(${v} ${v} ${v} / 0.7)`);
+      gr.addColorStop(1, `rgba(${v} ${v} ${v} / 0)`);
+      g.fillStyle = gr;
+      g.fillRect(-ry, -ry, ry * 2, ry * 2);
+      g.restore();
+    }
+  });
+  return dataTexture(c, false);
+}
+
+// Open-pored rosewood and satin maple: pores and fibres along the neck's
+// length (the v axis), on square 6 cm tiles. Normal and roughness maps.
+function fibreTile(seed: number, pores: number, grain: number, base: number) {
+  const R = rng(seed), N = 512;
+  const P = Array.from({ length: pores }, () => ({ x: R() * N, y: R() * N, l: 6 + R() * 34, w: 1 + R() * 1.6, a: 0.4 + R() * 0.6 }));
+  const G = Array.from({ length: grain }, () => ({ x: R() * N, m: 1 + Math.floor(R() * 3), ph: R() * 6.28, amp: R() * 2.4, a: 0.1 + R() * 0.25 }));
+  const lines = (g: CanvasRenderingContext2D, col: (a: number) => string) => {
+    g.lineWidth = 0.9;
+    for (const q of G) {
+      g.strokeStyle = col(q.a);
+      g.beginPath();
+      for (let y = 0; y <= N; y += 16) g[y ? 'lineTo' : 'moveTo'](q.x + q.amp * Math.sin((y / N) * Math.PI * 2 * q.m + q.ph), y);
+      g.stroke();
+    }
+  };
+  const normal = dataTexture(
+    normalFromHeight(
+      greyCanvas(N, N, (g) => {
+        g.fillStyle = '#909090';
+        g.fillRect(0, 0, N, N);
+        lines(g, (a) => `rgba(60 60 60 / ${a})`);
+        for (const p of P) {
+          g.fillStyle = `rgba(20 20 20 / ${p.a})`;
+          g.fillRect(p.x, p.y, p.w, p.l);
+          if (p.y + p.l > N) g.fillRect(p.x, p.y - N, p.w, p.l);
+        }
+      }),
+      1.5,
+    ),
+  );
+  const rough = dataTexture(
+    greyCanvas(N, N, (g) => {
+      g.fillStyle = `rgb(${base} ${base} ${base})`;
+      g.fillRect(0, 0, N, N);
+      lines(g, (a) => `rgba(255 255 255 / ${a * 0.5})`);
+      for (const p of P) {
+        g.fillStyle = `rgba(255 255 255 / ${p.a * 0.8})`;
+        g.fillRect(p.x, p.y, p.w, p.l);
+        if (p.y + p.l > N) g.fillRect(p.x, p.y - N, p.w, p.l);
+      }
+    }),
+  );
+  return { normal, rough };
+}
+
+// Drawn-wire winding: a round wire laid at a pitch of one texture row, as a
+// normal map. The wound strings' UVs run (round, along / pitch).
+let wireTex: THREE.Texture | undefined;
+function wireNormal() {
+  if (wireTex) return wireTex;
+  const N = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d')!;
+  const im = g.createImageData(N, N);
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      const f = (((y - x) / N) % 1 + 1) % 1;
+      const s = Math.sqrt(Math.max(0, 1 - Math.pow(2 * f - 1, 2)));
+      const v = 40 + 200 * s;
+      const o = (y * N + x) * 4;
+      im.data[o] = im.data[o + 1] = im.data[o + 2] = v;
+      im.data[o + 3] = 255;
+    }
+  g.putImageData(im, 0, 0);
+  return (wireTex = dataTexture(normalFromHeight(c, 4.5)));
+}
+
+// A coil of string round a tuner post: the helix descends from the post's top.
+class Helix extends THREE.Curve<THREE.Vector3> {
+  constructor(
+    private cx: number,
+    private cy: number,
+    private z0: number,
+    private rad: number,
+    private turns: number,
+    private pitch: number,
+  ) {
+    super();
+  }
+  getPoint(t: number, target = new THREE.Vector3()) {
+    const a = t * this.turns * Math.PI * 2;
+    return target.set(this.cx + Math.cos(a) * this.rad, this.cy + Math.sin(a) * this.rad, this.z0 - t * this.turns * this.pitch);
+  }
+}
+// Rewrites a rod's or tube's UVs to (round, metres along / wire pitch).
+function wireUV(g: G, tube: boolean, len: number, pitch: number) {
+  const uv = g.getAttribute('uv') as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) {
+    const a = uv.getX(i), b = uv.getY(i);
+    if (tube) uv.setXY(i, b, (a * len) / pitch);
+    else uv.setXY(i, a, (b * len) / pitch);
+  }
+  return g;
+}
+
+// A crowned medium-jumbo fret wire: a half-round crown on the board with
+// the ends filed back at ~35 degrees. y is the fret's position, w its width.
+function crownFret(y: number, w: number): G {
+  const NX = 44, NP = 18, rc = 0.00105, hc = 0.00099;
+  const pos: number[] = [], idx: number[] = [];
+  const row = (i: number) => -w / 2 + w * (0.5 - 0.5 * Math.cos((Math.PI * i) / NX));
+  for (let i = 0; i <= NX; i++) {
+    const x = row(i);
+    const e = smooth(w / 2 - 0.0015, w / 2, Math.abs(x));
+    for (let j = 0; j <= NP; j++) {
+      const th = (Math.PI * j) / NP;
+      pos.push(x, y + Math.cos(th) * rc * (1 - 0.4 * e), boardTop(x) - 0.00012 + Math.sin(th) * hc * (1 - 0.82 * e));
+    }
+  }
+  for (let i = 0; i < NX; i++)
+    for (let j = 0; j < NP; j++) {
+      const a = i * (NP + 1) + j, b = a + 1, c = a + NP + 2, d = a + NP + 1;
+      idx.push(a, b, c, a, c, d);
+    }
+  // End caps: fans to a centre point.
+  for (const end of [0, NX]) {
+    const x = row(end);
+    const ci = pos.length / 3;
+    pos.push(x, y, boardTop(x) - 0.00012 + 0.00005);
+    for (let j = 0; j < NP; j++) {
+      const a = end * (NP + 1) + j, b = a + 1;
+      if (end === 0) idx.push(ci, b, a);
+      else idx.push(ci, a, b);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+// Phillips-style cross cut as two hair-thin dark bars on a screw dome's top.
+function crossSlot(list: G[], x: number, y: number, z: number, r: number, ang = 0) {
+  for (const a of [0, Math.PI / 2]) list.push(at(new THREE.BoxGeometry(r * 1.5, r * 0.26, 0.00012), x, y, z, 0, 0, ang + a));
+}
+
 let studio: THREE.Texture | null = null;
 function studioEnv() {
   if (studio) return studio;
@@ -371,6 +647,8 @@ function metal(color: number, roughness: number) {
   return m;
 }
 function useStudioWhenNeeded(o: THREE.Mesh) {
+  // A realtime-only reflection trick; the path tracer traces the real room.
+  if (bakeQuality()) return;
   o.onBeforeRender = (_r, scene, _c, _g, mat) => {
     const m = mat as THREE.MeshStandardMaterial;
     const want = scene.environment ? null : studioEnv();
@@ -548,13 +826,13 @@ function subdivide(p0: V2[], f0: number[][], reg: number[], levels: number) {
 }
 
 function buildBody() {
-  const N = 220;
+  const N = bq(220, 640);
   const P = closedCurve(BODY_PTS, N);
   const NO = outward(P);
   const r = 0.0095; // edge roundover
   const pos: number[] = [], nor: number[] = [], uv: number[] = [], idx: number[] = [];
   const U = (x: number, y: number) => [(x + 0.18) / 0.36, y / 0.48];
-  const S = 6;
+  const S = bq(6, 14);
   const prof: [number, boolean][] = [];
   for (let k = 0; k <= S; k++) prof.push([-Math.PI / 2 + (k / S) * (Math.PI / 2), false]);
   for (let k = 0; k <= S; k++) prof.push([(k / S) * (Math.PI / 2), true]);
@@ -697,10 +975,33 @@ export function buildGuitar(): THREE.Group {
     clearcoat: 0.45,
     clearcoatRoughness: 0.42,
   });
+  if (bakeQuality()) {
+    // Polyester over alder: a deeper, smoother clear layer, with the grain
+    // still showing through the base and uneven hand-buffed roughness.
+    wood.clearcoat = 0.85;
+    wood.clearcoatRoughness = 0.2;
+    wood.bumpScale = 0.7;
+    wood.roughnessMap = lacquerRough();
+    wood.roughness = 0.52 / 0.85;
+    wood.ior = 1.5;
+    // Orange peel in the sprayed film, over the grain's own relief.
+    wood.normalMap = orangePeel();
+    wood.normalScale = new THREE.Vector2(0.45, 0.45);
+  }
   const mapleTex = mapleTexture();
   mapleTex.repeat.set(1, 1);
-  const maple = std(0xffffff, 0.55, 0, { map: mapleTex });
-  const rosewood = std(0xffffff, 0.75, 0, { map: rosewoodTexture() });
+  let mapleX: THREE.MeshStandardMaterialParameters = {};
+  let roseX: THREE.MeshStandardMaterialParameters = {};
+  if (bakeQuality()) {
+    // Satin-finished maple: fine fibres. Oiled rosewood: open pores, rougher
+    // inside the pore than on the fibre.
+    const m = fibreTile(52, 0, 170, 215);
+    mapleX = { normalMap: tile(m.normal, 5, 22), normalScale: new THREE.Vector2(0.16, 0.16), roughnessMap: tile(m.rough, 5, 22), roughness: 0.55 / 0.84 };
+    const r = fibreTile(61, 5400, 150, 205);
+    roseX = { normalMap: tile(r.normal, 1, 8.4), normalScale: new THREE.Vector2(0.9, 0.9), roughnessMap: tile(r.rough, 1, 8.4), roughness: 0.62 / 0.8 };
+  }
+  const maple = std(0xffffff, 0.55, 0, { map: mapleTex, ...mapleX });
+  const rosewood = std(0xffffff, 0.75, 0, { map: rosewoodTexture(), ...roseX });
   const guardWhite = std(0xf2f0e9, 0.38);
   const guardBlack = std(0x141312, 0.4);
   const blackPlastic = std(0x151413, 0.42);
@@ -708,8 +1009,19 @@ export function buildGuitar(): THREE.Group {
   const nickel = metal(0xd9d4c8, 0.28);
   const steel = metal(0xdcdcdc, 0.25);
   const wound = metal(0xc8bba0, 0.38);
-  const pearl = std(0xf1eee6, 0.3);
-  const nutMat = std(0xefe9da, 0.45);
+  const pearl = bakeQuality()
+    ? // Pearloid: a thin interference sheen over a creamy base, under a clear coat.
+      new THREE.MeshPhysicalMaterial({ color: 0xf0ece0, roughness: 0.18, iridescence: 0.55, iridescenceIOR: 1.6, iridescenceThicknessRange: [180, 420], clearcoat: 0.6, clearcoatRoughness: 0.1 })
+    : std(0xf1eee6, 0.3);
+  // Bone nut: yellowed, slightly waxy, with fine pitting.
+  const nutMat = bakeQuality() ? std(0xe9dfc6, 0.5, 0, { sheen: 0.4, sheenColor: new THREE.Color(0xf4ecd6), sheenRoughness: 0.5 } as THREE.MeshStandardMaterialParameters) : std(0xefe9da, 0.45);
+  if (bakeQuality()) {
+    wound.roughness = 0.33;
+    (wound as THREE.MeshStandardMaterial).normalMap = wireNormal();
+    (wound as THREE.MeshStandardMaterial).normalScale = new THREE.Vector2(1.1, 1.1);
+    steel.roughness = 0.17;
+  }
+  const fretMat = bakeQuality() ? std(0xdcd8cf, 0.2, 1) : nickel;
   const dark = std(0x0d0c0b, 0.6);
   const logo = new THREE.MeshStandardMaterial({ map: logoTexture(), transparent: true, roughness: 0.4, depthWrite: false });
 
@@ -729,8 +1041,8 @@ export function buildGuitar(): THREE.Group {
       bevelThickness: 0.0006,
       bevelSize: 0.0007,
       bevelOffset: -0.0007,
-      bevelSegments: 2,
-      curveSegments: 4,
+      bevelSegments: sg(2),
+      curveSegments: sg(4),
     });
     geo.translate(0, 0, z0 + (bevel ? 0 : 0));
     return geo;
@@ -746,6 +1058,11 @@ export function buildGuitar(): THREE.Group {
     for (const k of picks) {
       const x = gp[k][0] - gn[k][0] * 0.0045, y = gp[k][1] - gn[k][1] * 0.0045;
       chromeG.push(at(dome(0.0027, 0.0012), x, y, ZG));
+      if (bakeQuality()) {
+        // Countersunk Phillips screw: a rim ring, and a cross cut in the head.
+        chromeG.push(at(new THREE.TorusGeometry(0.0029, 0.00022, sg(5), sg(24)), x, y, ZG + 0.00006));
+        crossSlot(darkG, x, y, ZG + 0.00115, 0.0027, k * 0.7);
+      }
     }
   }
 
@@ -757,14 +1074,16 @@ export function buildGuitar(): THREE.Group {
       bevelThickness: 0.0014,
       bevelSize: 0.0014,
       bevelOffset: -0.0014,
-      bevelSegments: 3,
-      curveSegments: 12,
+      bevelSegments: sg(3),
+      curveSegments: sg(12),
     });
     whiteG.push(at(cover, 0, y, ZG + 0.0014));
     const top = ZG + 0.0014 + 0.0042 + 0.0014;
     for (let i = 0; i < 6; i++) {
-      const p = new THREE.CylinderGeometry(0.00235, 0.00235, 0.0006, 10);
+      const p = new THREE.CylinderGeometry(0.00235, 0.00235, 0.0006, sg(10));
       poleG.push(at(p, strX(i, y), y, top - 0.0002, Math.PI / 2));
+      // Bake: a chamfered, domed Alnico rod head, standing a little proud.
+      if (bakeQuality()) poleG.push(at(lathe([[0, 0], [0.00235, 0], [0.00235, 0.00025], [0.0019, 0.00055], [0.0009, 0.00072], [0, 0.00076]], 14).rotateX(Math.PI / 2), strX(i, y), y, top + 0.0000));
     }
     for (const s of [-1, 1]) chromeG.push(at(dome(0.0021, 0.0009), s * 0.0392, y, ZG));
   };
@@ -802,8 +1121,8 @@ export function buildGuitar(): THREE.Group {
       bevelThickness: 0.0006,
       bevelSize: 0.0006,
       bevelOffset: -0.0006,
-      bevelSegments: 2,
-      curveSegments: 4,
+      bevelSegments: sg(2),
+      curveSegments: sg(4),
     });
     blackG.push(at(ringGeo, 0, Y_HUM, ZF + 0.0006));
     for (const sx of [-1, 1]) for (const sy of [-1, 1]) chromeG.push(at(dome(0.0019, 0.0008), sx * 0.0395, Y_HUM + sy * 0.0175, ZF + 0.0038));
@@ -815,8 +1134,8 @@ export function buildGuitar(): THREE.Group {
         bevelThickness: 0.0009,
         bevelSize: 0.0009,
         bevelOffset: -0.0009,
-        bevelSegments: 2,
-        curveSegments: 10,
+        bevelSegments: sg(2),
+        curveSegments: sg(10),
       });
       const by = Y_HUM + s * 0.00885;
       whiteG.push(at(bob, 0, by, ZF + 0.0018));
@@ -825,10 +1144,15 @@ export function buildGuitar(): THREE.Group {
         const x = strX(i, by);
         if (s < 0) {
           // Adjustable screw poles on the bridge-side coil.
-          poleG.push(at(new THREE.CylinderGeometry(0.0021, 0.0021, 0.0012, 14), x, by, top + 0.0002, Math.PI / 2));
-          darkG.push(at(new THREE.BoxGeometry(0.003, 0.0005, 0.0003), x, by, top + 0.0009));
+          poleG.push(at(new THREE.CylinderGeometry(0.0021, 0.0021, 0.0012, sg(14)), x, by, top + 0.0002, Math.PI / 2));
+          darkG.push(at(new THREE.BoxGeometry(0.003, 0.0005, 0.0003), x, by, top + 0.0009, 0, 0, bakeQuality() ? (i % 3) * 0.5 : 0));
+          // Bake: the screw head's chamfer, and a dark thread-gap ring round it.
+          if (bakeQuality()) {
+            poleG.push(at(new THREE.TorusGeometry(0.0021, 0.0003, sg(4), sg(16)), x, by, top + 0.0007));
+            darkG.push(at(new THREE.TorusGeometry(0.00235, 0.00018, sg(4), sg(16)), x, by, top - 0.0001));
+          }
         } else {
-          poleG.push(at(new THREE.CylinderGeometry(0.0024, 0.0024, 0.0006, 14), x, by, top - 0.0002, Math.PI / 2));
+          poleG.push(at(new THREE.CylinderGeometry(0.0024, 0.0024, 0.0006, sg(14)), x, by, top - 0.0002, Math.PI / 2));
         }
       }
     }
@@ -838,10 +1162,13 @@ export function buildGuitar(): THREE.Group {
   // pivot screws, intonation screws and springs. No arm is fitted.
   {
     const front = 0.1418, back = 0.1015, w = 0.071;
-    chromeG.push(at(new RoundedBoxGeometry(w, front - back, 0.0022, 2, 0.0008), -0.0015, (front + back) / 2, ZF + 0.0011));
-    chromeG.push(at(new RoundedBoxGeometry(0.012, 0.022, 0.0034, 2, 0.0012), 0.0375, 0.1125, ZF + 0.0017));
-    chromeG.push(at(new RoundedBoxGeometry(w - 0.004, 0.0019, 0.0085, 2, 0.0007), -0.0015, back + 0.001, ZF + 0.0042));
-    for (let k = 0; k < 6; k++) chromeG.push(at(dome(0.0027, 0.0012), -0.0275 + k * 0.011, 0.1368, ZF + 0.0022));
+    chromeG.push(at(new RoundedBoxGeometry(w, front - back, 0.0022, sg(2), 0.0008), -0.0015, (front + back) / 2, ZF + 0.0011));
+    chromeG.push(at(new RoundedBoxGeometry(0.012, 0.022, 0.0034, sg(2), 0.0012), 0.0375, 0.1125, ZF + 0.0017));
+    chromeG.push(at(new RoundedBoxGeometry(w - 0.004, 0.0019, 0.0085, sg(2), 0.0007), -0.0015, back + 0.001, ZF + 0.0042));
+    for (let k = 0; k < 6; k++) {
+      chromeG.push(at(dome(0.0027, 0.0012), -0.0275 + k * 0.011, 0.1368, ZF + 0.0022));
+      if (bakeQuality()) crossSlot(darkG, -0.0275 + k * 0.011, 0.1368, ZF + 0.00335, 0.0027, k * 0.9);
+    }
     for (let i = 0; i < 6; i++) {
       const x = SAD_X(i), ys = Y_SADDLE - COMP[i];
       const top = Z_SAD(i) - GAUGE[i];
@@ -849,12 +1176,12 @@ export function buildGuitar(): THREE.Group {
       const len = 0.0175;
       const cy = ys - len / 2 + 0.0018;
       // Bent-steel saddle: a low base with a raised front lip the string breaks over.
-      chromeG.push(at(new RoundedBoxGeometry(0.0098, len, 0.0022, 2, 0.0006), x, cy, bottom + 0.0011));
-      chromeG.push(at(new RoundedBoxGeometry(0.0098, 0.0035, top - bottom, 2, 0.001), x, ys - 0.0005, (top + bottom) / 2));
-      chromeG.push(at(new RoundedBoxGeometry(0.0098, 0.0028, (top - bottom) * 0.75, 2, 0.0008), x, cy - len / 2 + 0.0014, bottom + (top - bottom) * 0.375));
+      chromeG.push(at(new RoundedBoxGeometry(0.0098, len, 0.0022, sg(2), 0.0006), x, cy, bottom + 0.0011));
+      chromeG.push(at(new RoundedBoxGeometry(0.0098, 0.0035, top - bottom, sg(2), 0.001), x, ys - 0.0005, (top + bottom) / 2));
+      chromeG.push(at(new RoundedBoxGeometry(0.0098, 0.0028, (top - bottom) * 0.75, sg(2), 0.0008), x, cy - len / 2 + 0.0014, bottom + (top - bottom) * 0.375));
       for (const s of [-1, 1]) {
-        nickelG.push(at(new THREE.CylinderGeometry(0.0013, 0.0013, top - bottom - 0.001, 8), x + s * 0.0027, cy - 0.002, bottom + (top - bottom - 0.001) / 2, Math.PI / 2));
-        darkG.push(at(new THREE.CylinderGeometry(0.0008, 0.0008, 0.0002, 6), x + s * 0.0027, cy - 0.002, top - 0.0009, Math.PI / 2));
+        nickelG.push(at(new THREE.CylinderGeometry(0.0013, 0.0013, top - bottom - 0.001, sg(8)), x + s * 0.0027, cy - 0.002, bottom + (top - bottom - 0.001) / 2, Math.PI / 2));
+        darkG.push(at(new THREE.CylinderGeometry(0.0008, 0.0008, 0.0002, sg(6)), x + s * 0.0027, cy - 0.002, top - 0.0009, Math.PI / 2));
       }
       const ya = cy - len / 2, yb = back + 0.002;
       chromeG.push(rod(new THREE.Vector3(x, ya, bottom + 0.0028), new THREE.Vector3(x, yb, bottom + 0.0028), 0.0011, 8));
@@ -895,12 +1222,20 @@ export function buildGuitar(): THREE.Group {
     };
     chromeG.push(at(knob(), 0.0684, 0.1512, ZF));
     chromeG.push(at(knob(), 0.0994, 0.0989, ZF));
+    if (bakeQuality()) {
+      // Bushing collar where each shaft leaves the body, a rolled foot, and a
+      // fine dark gap between the knob skirt and the finish.
+      for (const [kx, ky] of [[0.0684, 0.1512], [0.0994, 0.0989]]) {
+        nickelG.push(at(lathe([[0.0112, 0], [0.0112, 0.0003], [0.0108, 0.0006], [0.0098, 0.0008], [0.0098, 0]], 40).rotateX(Math.PI / 2), kx, ky, ZF));
+        darkG.push(at(new THREE.TorusGeometry(0.00975, 0.00018, sg(4), sg(40)), kx, ky, ZF + 0.00025));
+      }
+    }
     const sx = 0.107, sy = 0.1714, a = 0.42;
-    darkG.push(at(new RoundedBoxGeometry(0.0045, 0.025, 0.0004, 2, 0.0015), sx, sy, ZG + 0.0001, 0, 0, a));
+    darkG.push(at(new RoundedBoxGeometry(0.0045, 0.025, 0.0004, sg(2), 0.0015), sx, sy, ZG + 0.0001, 0, 0, a));
     // Lever in the middle position.
     const base = new THREE.Vector3(sx, sy, ZG);
     chromeG.push(rod(base, base.clone().add(new THREE.Vector3(0, 0, 0.0075)), 0.0011, 6));
-    const tip = new RoundedBoxGeometry(0.0062, 0.0078, 0.0095, 2, 0.0028);
+    const tip = new RoundedBoxGeometry(0.0062, 0.0078, 0.0095, sg(2), 0.0028);
     tip.rotateZ(a);
     whiteG.push(tip.translate(sx, sy, ZG + 0.011));
   }
@@ -914,9 +1249,15 @@ export function buildGuitar(): THREE.Group {
   {
     const j = ptNear(([x, y]) => (x < 0 ? 9 : Math.abs(y - 0.042)));
     const o = new THREE.Vector3(P[j][0], P[j][1], 0), n = new THREE.Vector3(NO[j][0], NO[j][1], 0);
-    chromeG.push(along(new THREE.CylinderGeometry(0.0115, 0.0115, 0.0012, 32).translate(0, 0.0006, 0), o, n));
-    chromeG.push(along(new THREE.CylinderGeometry(0.0062, 0.0062, 0.0034, 6).translate(0, 0.0017, 0), o, n));
-    darkG.push(along(new THREE.CylinderGeometry(0.0033, 0.0033, 0.0002, 16).translate(0, 0.0035, 0), o, n));
+    chromeG.push(along(new THREE.CylinderGeometry(0.0115, 0.0115, 0.0012, sg(32)).translate(0, 0.0006, 0), o, n));
+    chromeG.push(along(new THREE.CylinderGeometry(0.0062, 0.0062, 0.0034, sg(6)).translate(0, 0.0017, 0), o, n));
+    darkG.push(along(new THREE.CylinderGeometry(0.0033, 0.0033, 0.0002, sg(16)).translate(0, 0.0035, 0), o, n));
+    if (bakeQuality()) {
+      // The jack's threaded ferrule, its rolled lip and the socket's contact ring.
+      chromeG.push(along(new THREE.TorusGeometry(0.0059, 0.0004, sg(5), sg(24)).rotateX(Math.PI / 2).translate(0, 0.0036, 0), o, n));
+      nickelG.push(along(new THREE.TorusGeometry(0.0024, 0.00045, sg(5), sg(16)).rotateX(Math.PI / 2).translate(0, 0.0031, 0), o, n));
+      for (let t = 0; t < 4; t++) darkG.push(along(new THREE.CylinderGeometry(0.00018, 0.00018, 0.0004, 5).translate(0.0074 * Math.cos(t * 1.571 + 0.785), 0.0013, 0.0074 * Math.sin(t * 1.571 + 0.785)), o, n));
+    }
   }
   const strapButton = () =>
     lathe(
@@ -935,16 +1276,31 @@ export function buildGuitar(): THREE.Group {
     );
   const jb = ptNear(([, y]) => y);
   chromeG.push(along(strapButton(), new THREE.Vector3(P[jb][0], P[jb][1], 0), new THREE.Vector3(0, -1, 0)));
+  if (bakeQuality()) {
+    // Black felt washers under both strap buttons.
+    const felt = (i: number, d: THREE.Vector3) =>
+      darkG.push(along(new THREE.CylinderGeometry(0.0082, 0.0082, 0.0007, sg(28)).translate(0, 0.00035, 0), new THREE.Vector3(P[i][0], P[i][1], 0).addScaledVector(d, -0.0001), d));
+    felt(jb, new THREE.Vector3(0, -1, 0));
+  }
   const jh = ptNear(([x, y]) => (x > 0 ? 9 : -y));
   chromeG.push(along(strapButton(), new THREE.Vector3(P[jh][0], P[jh][1], 0), new THREE.Vector3(NO[jh][0], NO[jh][1], 0)));
+  if (bakeQuality()) {
+    const d = new THREE.Vector3(NO[jh][0], NO[jh][1], 0);
+    darkG.push(along(new THREE.CylinderGeometry(0.0082, 0.0082, 0.0007, sg(28)).translate(0, 0.00035, 0), new THREE.Vector3(P[jh][0], P[jh][1], 0).addScaledVector(d, -0.0001), d));
+  }
 
   // Back: neck plate with four bolts, tremolo cavity cover.
   {
     const ny = 0.298;
-    chromeG.push(at(new RoundedBoxGeometry(0.051, 0.05, 0.0012, 2, 0.005), 0, ny, ZB - 0.0006));
-    for (const sx of [-1, 1]) for (const sy of [-1, 1]) chromeG.push(at(dome(0.0035, 0.0016), sx * 0.0185, ny + sy * 0.0175, ZB - 0.0012, Math.PI));
-    blackG.push(at(new RoundedBoxGeometry(0.075, 0.088, 0.0016, 2, 0.008), 0, Y_SADDLE - 0.002, ZB - 0.0008));
-    for (let i = 0; i < 6; i++) darkG.push(at(new RoundedBoxGeometry(0.0042, 0.0075, 0.0008, 2, 0.0018), SAD_X(i) * 0.9, Y_SADDLE - 0.02, ZB - 0.0018));
+    chromeG.push(at(new RoundedBoxGeometry(0.051, 0.05, 0.0012, sg(2), 0.005), 0, ny, ZB - 0.0006));
+    for (const sx of [-1, 1])
+      for (const sy of [-1, 1]) {
+        chromeG.push(at(dome(0.0035, 0.0016), sx * 0.0185, ny + sy * 0.0175, ZB - 0.0012, Math.PI));
+        // Bake: round-head wood screws with a cross cut (the cut faces -z).
+        if (bakeQuality()) crossSlot(darkG, sx * 0.0185, ny + sy * 0.0175, ZB - 0.00285, 0.0035, sx * 0.4 + sy * 0.2);
+      }
+    blackG.push(at(new RoundedBoxGeometry(0.075, 0.088, 0.0016, sg(2), 0.008), 0, Y_SADDLE - 0.002, ZB - 0.0008));
+    for (let i = 0; i < 6; i++) darkG.push(at(new RoundedBoxGeometry(0.0042, 0.0075, 0.0008, sg(2), 0.0018), SAD_X(i) * 0.9, Y_SADDLE - 0.02, ZB - 0.0018));
   }
 
   // Neck -----------------------------------------------------------------
@@ -978,8 +1334,8 @@ export function buildGuitar(): THREE.Group {
       bevelThickness: 0.0015,
       bevelSize: 0.0015,
       bevelOffset: -0.0015,
-      bevelSegments: 2,
-      curveSegments: 4,
+      bevelSegments: sg(2),
+      curveSegments: sg(4),
     });
     head.translate(0, 0, ZNT - 0.013);
     planarUV(head, 4, 0.5, 0.9, 0);
@@ -987,8 +1343,14 @@ export function buildGuitar(): THREE.Group {
     const decal = new THREE.PlaneGeometry(0.09, 0.195);
     g.add(mesh(at(decal, 0.011, Y_NUT + 0.0975, ZNT + 0.0002), logo, false));
     // Truss-rod cover just above the nut.
-    blackG.push(at(new RoundedBoxGeometry(0.0088, 0.019, 0.0008, 2, 0.0036), 0, Y_NUT + 0.0125, ZNT + 0.0004));
+    blackG.push(at(new RoundedBoxGeometry(0.0088, 0.019, 0.0008, sg(2), 0.0036), 0, Y_NUT + 0.0125, ZNT + 0.0004));
     chromeG.push(at(dome(0.0016, 0.0006), 0, Y_NUT + 0.0165, ZNT + 0.0008));
+    if (bakeQuality()) {
+      for (const sy of [-1, 1]) {
+        chromeG.push(at(dome(0.0014, 0.0005), 0, Y_NUT + 0.0125 + sy * 0.0069, ZNT + 0.0008));
+        crossSlot(darkG, 0, Y_NUT + 0.0125 + sy * 0.0069, ZNT + 0.00128, 0.0014, sy * 0.6);
+      }
+    }
 
     // Fretboard: radiused rosewood.
     const NB = 40, KB = 12;
@@ -1024,7 +1386,11 @@ export function buildGuitar(): THREE.Group {
     const frets: G[] = [];
     for (let k = 1; k <= 22; k++) {
       const y = fretY(k), w = bw(y) - 0.0006;
-      const f = new THREE.CylinderGeometry(0.00115, 0.00115, w, 8, 8);
+      if (bakeQuality()) {
+        frets.push(crownFret(y, w));
+        continue;
+      }
+      const f = new THREE.CylinderGeometry(0.00115, 0.00115, w, sg(8), 8);
       f.rotateZ(Math.PI / 2);
       f.scale(1, 1, 0.95);
       const p = f.getAttribute('position');
@@ -1037,16 +1403,16 @@ export function buildGuitar(): THREE.Group {
       f.computeVertexNormals();
       frets.push(f);
     }
-    g.add(mesh(merge(frets), nickel));
+    g.add(mesh(merge(frets), fretMat));
     const dots: G[] = [];
     const between = (k: number) => (fretY(k) + fretY(k - 1)) / 2;
     for (const k of [3, 5, 7, 9, 12, 15, 17, 19, 21]) {
       const y = between(k);
       const xs = k === 12 ? [-0.0105, 0.0105] : [0];
-      for (const x of xs) dots.push(at(new THREE.CylinderGeometry(0.003, 0.003, 0.0006, 20), x, y, boardTop(x) - 0.00025, Math.PI / 2));
+      for (const x of xs) dots.push(at(new THREE.CylinderGeometry(0.003, 0.003, 0.0006, sg(20)), x, y, boardTop(x) - 0.00025, Math.PI / 2));
       const sx = -bw(y) / 2 - 0.0002;
       const sdy = k === 12 ? [-0.0035, 0.0035] : [0];
-      for (const dy of sdy) dots.push(at(new THREE.CylinderGeometry(0.001, 0.001, 0.0006, 10), sx, y + dy, ZNT + 0.0036, 0, 0, Math.PI / 2));
+      for (const dy of sdy) dots.push(at(new THREE.CylinderGeometry(0.001, 0.001, 0.0006, sg(10)), sx, y + dy, ZNT + 0.0036, 0, 0, Math.PI / 2));
     }
     g.add(mesh(merge(dots), pearl, false));
     const hN = FB + 0.0024;
@@ -1055,6 +1421,10 @@ export function buildGuitar(): THREE.Group {
     for (let v = 0; v < np.count; v++) if (np.getZ(v) > 0) np.setZ(v, np.getZ(v) - sag(np.getX(v)));
     nut.computeVertexNormals();
     g.add(mesh(at(nut, 0, Y_NUT + 0.0017, ZNT + hN / 2), nutMat));
+    if (bakeQuality()) {
+      // String slots: dark channels on the nut's top, a touch wider than each string.
+      for (let i = 0; i < 6; i++) darkG.push(at(new THREE.BoxGeometry(Math.max(0.0007, GAUGE[i] * 2.7), 0.003, 0.0002), NUT_X(i), Y_NUT + 0.0017, ZNT + hN - sag(NUT_X(i)) + 0.00004));
+    }
   }
 
   // Tuners, string trees and strings ------------------------------------
@@ -1072,19 +1442,33 @@ export function buildGuitar(): THREE.Group {
     const zBack = ZNT - 0.0145;
     for (let i = 0; i < 6; i++) {
       const x = postX(i), y = postY(i);
-      chromeG.push(at(new THREE.CylinderGeometry(0.0056, 0.0056, 0.0005, 20), x, y, ZNT + 0.00025, Math.PI / 2));
-      chromeG.push(at(new THREE.CylinderGeometry(0.0055, 0.006, 0.0022, 24), x, y, ZNT + 0.0016, Math.PI / 2));
-      chromeG.push(at(new THREE.CylinderGeometry(0.0029, 0.0029, 0.0105, 16), x, y, ZNT + 0.0023 + 0.00525, Math.PI / 2));
+      chromeG.push(at(new THREE.CylinderGeometry(0.0056, 0.0056, 0.0005, sg(20)), x, y, ZNT + 0.00025, Math.PI / 2));
+      chromeG.push(at(new THREE.CylinderGeometry(0.0055, 0.006, 0.0022, sg(24)), x, y, ZNT + 0.0016, Math.PI / 2));
+      chromeG.push(at(new THREE.CylinderGeometry(0.0029, 0.0029, 0.0105, sg(16)), x, y, ZNT + 0.0023 + 0.00525, Math.PI / 2));
       chromeG.push(at(dome(0.0029, 0.001, 10), x, y, ZNT + 0.0128));
       darkG.push(at(new THREE.BoxGeometry(0.0062, 0.0009, 0.0016), x, y, ZNT + 0.0082));
       // Sealed housing behind, shaft and key out past the bass edge.
       const d = new THREE.Vector2(-0.95, 0.31);
       const rz = Math.atan2(d.y, d.x);
       const zc = zBack - 0.005;
-      chromeG.push(at(new RoundedBoxGeometry(0.019, 0.0145, 0.0095, 2, 0.0025), x + d.x * 0.003, y + d.y * 0.003, zBack - 0.00475, 0, 0, rz));
+      chromeG.push(at(new RoundedBoxGeometry(0.019, 0.0145, 0.0095, sg(2), 0.0025), x + d.x * 0.003, y + d.y * 0.003, zBack - 0.00475, 0, 0, rz));
       chromeG.push(rod(new THREE.Vector3(x + d.x * 0.012, y + d.y * 0.012, zc), new THREE.Vector3(x + d.x * 0.017, y + d.y * 0.017, zc), 0.0017, 10));
-      chromeG.push(at(new RoundedBoxGeometry(0.0165, 0.0155, 0.0055, 3, 0.0026), x + d.x * 0.0235, y + d.y * 0.0235, zc, 0, 0, rz));
-      chromeG.push(at(new THREE.CylinderGeometry(0.0031, 0.0027, 0.005, 12), x + d.x * 0.0155, y + d.y * 0.0155, zc, 0, 0, rz + Math.PI / 2));
+      chromeG.push(at(new RoundedBoxGeometry(0.0165, 0.0155, 0.0055, sg(3), 0.0026), x + d.x * 0.0235, y + d.y * 0.0235, zc, 0, 0, rz));
+      chromeG.push(at(new THREE.CylinderGeometry(0.0031, 0.0027, 0.005, sg(12)), x + d.x * 0.0155, y + d.y * 0.0155, zc, 0, 0, rz + Math.PI / 2));
+      if (bakeQuality()) {
+        // Hex bushing nut over the ferrule, and the string hole drilled through the post.
+        chromeG.push(at(new THREE.CylinderGeometry(0.0043, 0.0043, 0.0009, 6), x, y, ZNT + 0.00315, Math.PI / 2, i * 0.37, 0));
+        darkG.push(at(new THREE.CylinderGeometry(0.00075, 0.00075, 0.0064, sg(8)), x, y, ZNT + 0.0084, 0, 0, Math.PI / 2 + 0.2));
+        // Worm shaft threads, the button's dimples and its screw (both faces).
+        for (let t = 0; t < 4; t++) darkG.push(at(new THREE.TorusGeometry(0.0017, 0.00018, 4, 10), x + d.x * (0.0125 + t * 0.0012), y + d.y * (0.0125 + t * 0.0012), zc, 0, Math.PI / 2, 0));
+        const bx = x + d.x * 0.0235, by = y + d.y * 0.0235;
+        for (const sgn of [-1, 1]) {
+          const zz = zc + sgn * 0.00275;
+          chromeG.push(at(dome(0.0016, 0.0006), bx, by, zz, sgn > 0 ? 0 : Math.PI));
+          darkG.push(at(new THREE.TorusGeometry(0.0041, 0.00022, 4, 24), bx, by, zz + sgn * 0.00003));
+          crossSlot(darkG, bx, by, zz + sgn * 0.00058, 0.0016, i);
+        }
+      }
     }
   }
   const plain: G[] = [], wnd: G[] = [];
@@ -1105,12 +1489,33 @@ export function buildGuitar(): THREE.Group {
         pts.push(new THREE.Vector3(NUT_X(i) + (post.x - NUT_X(i)) * t, treeY, ZNT + 0.0033 - r));
       }
       pts.push(post);
-      for (let k = 0; k < pts.length - 1; k++) (i < 3 ? wnd : plain).push(rod(pts[k], pts[k + 1], r, i < 3 ? 6 : 5));
-      // A few wraps round the post.
-      (i < 3 ? wnd : plain).push(
-        at(new THREE.TorusGeometry(0.0029 + r, r, 4, 16), postX(i), postY(i), post.z - 0.0012, 0, 0, 0).applyMatrix4(new THREE.Matrix4()),
-        at(new THREE.TorusGeometry(0.0029 + r, r, 4, 16), postX(i), postY(i), post.z - 0.0012 - 2.2 * r - 0.0002),
-      );
+      if (bakeQuality()) {
+        const isWound = i < 3;
+        const target = isWound ? wnd : plain;
+        const pitch = WIRE_PITCH[i];
+        for (let k = 0; k < pts.length - 1; k++) {
+          const seg = rod(pts[k], pts[k + 1], r, isWound ? 14 : 7);
+          target.push(isWound ? wireUV(seg, false, pts[k].distanceTo(pts[k + 1]), pitch) : seg);
+        }
+        // Real helical wraps down the post (descending), then the cut tail.
+        const R0 = 0.0029 + r;
+        const turns = isWound ? 2.5 : i === 5 ? 4 : 3.5;
+        const lead = isWound ? 2.05 * r : 2.15 * r;
+        const tube = new THREE.TubeGeometry(new Helix(postX(i), postY(i), post.z, R0, turns, lead), Math.round(turns * 30), r, isWound ? 14 : 8, false);
+        target.push(isWound ? wireUV(tube, true, turns * Math.PI * 2 * R0, pitch) : tube);
+        const a = turns * Math.PI * 2;
+        const end = new THREE.Vector3(postX(i) + Math.cos(a) * R0, postY(i) + Math.sin(a) * R0, post.z - turns * lead);
+        const tan = new THREE.Vector3(-Math.sin(a), Math.cos(a), -lead / (Math.PI * 2 * R0)).normalize();
+        const tail = rod(end, end.clone().addScaledVector(tan, 0.0032), r, isWound ? 10 : 6);
+        target.push(isWound ? wireUV(tail, false, 0.0032, pitch) : tail);
+      } else {
+        for (let k = 0; k < pts.length - 1; k++) (i < 3 ? wnd : plain).push(rod(pts[k], pts[k + 1], r, i < 3 ? 6 : 5));
+        // A few wraps round the post.
+        (i < 3 ? wnd : plain).push(
+          at(new THREE.TorusGeometry(0.0029 + r, r, sg(4), sg(16)), postX(i), postY(i), post.z - 0.0012, 0, 0, 0).applyMatrix4(new THREE.Matrix4()),
+          at(new THREE.TorusGeometry(0.0029 + r, r, sg(4), sg(16)), postX(i), postY(i), post.z - 0.0012 - 2.2 * r - 0.0002),
+        );
+      }
     }
     // Butterfly string tree for the B and E strings.
     const tx = (strTreeX(4) + strTreeX(5)) / 2;
@@ -1118,8 +1523,8 @@ export function buildGuitar(): THREE.Group {
       const px = postX(i) + 0.0029 + GAUGE[i];
       return NUT_X(i) + (px - NUT_X(i)) * ((treeY - Y_NUT) / (postY(i) - Y_NUT));
     }
-    chromeG.push(at(new THREE.CylinderGeometry(0.0016, 0.0016, 0.0034, 10), tx, treeY, ZNT + 0.0017, Math.PI / 2));
-    chromeG.push(at(new RoundedBoxGeometry(0.0125, 0.0045, 0.0011, 2, 0.0004), tx, treeY, ZNT + 0.0039));
+    chromeG.push(at(new THREE.CylinderGeometry(0.0016, 0.0016, 0.0034, sg(10)), tx, treeY, ZNT + 0.0017, Math.PI / 2));
+    chromeG.push(at(new RoundedBoxGeometry(0.0125, 0.0045, 0.0011, sg(2), 0.0004), tx, treeY, ZNT + 0.0039));
     chromeG.push(at(dome(0.0018, 0.0008), tx, treeY, ZNT + 0.0044));
   }
   const sPlain = mesh(merge(plain), steel, false);

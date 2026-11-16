@@ -12,7 +12,7 @@
 //
 //   buildSpeaker('left') / buildSpeaker('right')
 
-import { THREE, std, mesh, canvasTexture, RoundedBoxGeometry } from './kit';
+import { THREE, std, mesh, canvasTexture, RoundedBoxGeometry, sg, bq, bakeQuality, mottleMap, greyCanvas, normalFromHeight, dataTexture, weaveHeight } from './kit';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // Collects static parts per material and merges them into one mesh each.
@@ -74,7 +74,8 @@ function woodGrain(len: number, across: number, seed: number, kind: 'map' | 'bum
   const key = `${len}:${across}:${seed}:${kind}`;
   const hit = woodCache.get(key);
   if (hit) return hit;
-  const px = 2600; // px per metre
+  const px = bq(1200, 2400); // px per metre
+  const scale = px / 2600;
   const w = Math.round(len * px);
   const h = Math.round(across * px);
   const t = canvasTexture(w, h, (g) => {
@@ -86,7 +87,7 @@ function woodGrain(len: number, across: number, seed: number, kind: 'map' | 'bum
     if (!bump)
       for (let i = 0; i < 30; i++) {
         const y = r() * h;
-        const bh = 4 + r() * 70;
+        const bh = (4 + r() * 70) * scale;
         const c = 0.5 + r() * 0.5;
         g.fillStyle = r() < 0.55 ? `rgba(130 74 30 / ${0.12 * c})` : `rgba(226 176 120 / ${0.14 * c})`;
         g.fillRect(0, y, w, bh);
@@ -95,7 +96,7 @@ function woodGrain(len: number, across: number, seed: number, kind: 'map' | 'bum
     const lines = Math.round(h / 2.4);
     for (let i = 0; i < lines; i++) {
       const y0 = r() * h;
-      const amp = 0.4 + r() * 1.6;
+      const amp = (0.4 + r() * 1.6) * scale;
       const freq = (0.3 + r() * 0.7) / w;
       const ph = r() * 10;
       const dark = r();
@@ -104,12 +105,12 @@ function woodGrain(len: number, across: number, seed: number, kind: 'map' | 'bum
         : dark < 0.78
           ? `rgba(122 66 26 / ${0.04 + dark * 0.12})`
           : `rgba(222 168 112 / ${0.12 + (dark - 0.78) * 0.6})`;
-      g.lineWidth = 0.6 + r() * (dark > 0.92 ? 2.2 : 1.1);
+      g.lineWidth = (0.6 + r() * (dark > 0.92 ? 2.2 : 1.1)) * Math.max(0.7, scale);
       g.beginPath();
       const x0 = r() < 0.3 ? r() * w * 0.6 : 0;
       const x1 = x0 === 0 ? w : Math.min(w, x0 + w * (0.3 + r() * 0.7));
       for (let x = x0; x <= x1; x += 12) {
-        const y = y0 + Math.sin(x * freq * Math.PI * 2 + ph) * amp + Math.sin(x * 0.011 + ph) * 0.8;
+        const y = y0 + Math.sin(x * freq * Math.PI * 2 + ph) * amp + Math.sin(x * 0.011 + ph) * 0.8 * scale;
         if (x === x0) g.moveTo(x, y);
         else g.lineTo(x, y);
       }
@@ -119,7 +120,7 @@ function woodGrain(len: number, across: number, seed: number, kind: 'map' | 'bum
     for (let i = 0; i < w * h * 0.0007; i++) {
       const a = 0.1 + r() * 0.25;
       g.fillStyle = bump ? `rgba(0 0 0 / ${a + 0.2})` : `rgba(110 56 20 / ${a * 0.5})`;
-      g.fillRect(r() * w, r() * h, 3 + r() * 14, 0.6 + r() * 0.7);
+      g.fillRect(r() * w, r() * h, (3 + r() * 14) * scale, 0.6 + r() * 0.7);
     }
     // A couple of soft cathedral figures.
     for (let k = 0; k < 2; k++) {
@@ -127,7 +128,7 @@ function woodGrain(len: number, across: number, seed: number, kind: 'map' | 'bum
       const cy = r() * h;
       const n = 5 + Math.floor(r() * 5);
       for (let j = 0; j < n; j++) {
-        const s = 1 + j * (5 + r() * 3);
+        const s = (1 + j * (5 + r() * 3)) * scale;
         g.strokeStyle = bump ? 'rgba(0 0 0 / 0.25)' : `rgba(110 56 20 / ${0.1 + r() * 0.1})`;
         g.lineWidth = 0.8 + r();
         g.beginPath();
@@ -141,23 +142,59 @@ function woodGrain(len: number, across: number, seed: number, kind: 'map' | 'bum
   return t;
 }
 
+// Bake only: the grain's height field (the bump canvas) as a tangent-space
+// normal map. For a rotated face the canvas itself is turned first (a texture
+// rotation would turn the picture but not the normals' directions), with the
+// same mapping three.js applies to the colour map.
+function woodNormal(len: number, across: number, seed: number, rotate: boolean) {
+  const src = woodGrain(len, across, seed, 'bump').image as HTMLCanvasElement;
+  let c = src;
+  if (rotate) {
+    c = document.createElement('canvas');
+    c.width = src.height;
+    c.height = src.width;
+    const g = c.getContext('2d')!;
+    g.setTransform(0, -1, 1, 0, 0, src.width);
+    g.drawImage(src, 0, 0);
+  }
+  return dataTexture(normalFromHeight(c, 2.6, false), false);
+}
+
 // Wood material for one face; `rotate` turns the grain 90 degrees (for
 // faces whose u axis is not along the grain). len runs along the grain.
 function woodMat(len: number, across: number, seed: number, rotate = false) {
-  const map = woodGrain(len, across, seed, 'map').clone();
-  const bump = woodGrain(len, across, seed, 'bump').clone();
-  for (const t of [map, bump]) {
-    t.needsUpdate = true;
-    if (rotate) {
+  let map = woodGrain(len, across, seed, 'map');
+  let bump = woodGrain(len, across, seed, 'bump');
+  if (rotate) {
+    map = map.clone();
+    bump = bump.clone();
+    for (const t of [map, bump]) {
+      t.needsUpdate = true;
       t.center.set(0.5, 0.5);
       t.rotation = Math.PI / 2;
     }
+  }
+  if (bakeQuality()) {
+    // Printed wood-effect vinyl: a thin satin clear layer, uneven roughness,
+    // and the open grain as a real normal map, laid out per face so the
+    // grooves run the way this panel's grain does.
+    return new THREE.MeshPhysicalMaterial({
+      map,
+      normalMap: woodNormal(len, across, seed, rotate),
+      normalScale: new THREE.Vector2(0.9, 0.9),
+      roughness: 0.6 / 0.85,
+      roughnessMap: mottleMap(),
+      clearcoat: 0.3,
+      clearcoatRoughness: 0.4,
+    });
   }
   return new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 0.3, roughness: 0.6 });
 }
 
 // Fine stipple for the matte black plastic and MDF faces.
+let stippleTex: THREE.Texture | undefined;
 function stipple() {
+  if (stippleTex) return stippleTex;
   const t = canvasTexture(128, 128, (g) => {
     const r = rng(99);
     g.fillStyle = '#808080';
@@ -171,13 +208,16 @@ function stipple() {
   t.colorSpace = THREE.NoColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(6, 6);
-  return t;
+  return (stippleTex = t);
 }
 
 // Mid grey woven grille cloth. Tiles every 3.3 cm (the extruded grille's
 // UVs are in metres).
 const FABRIC = 158; // cloth albedo (0-255), tuned against the photo
+const fabricCache = new Map<boolean, THREE.Texture>();
 function fabric(bump: boolean) {
+  const hit = fabricCache.get(bump);
+  if (hit) return hit;
   const t = canvasTexture(256, 256, (g) => {
     const r = rng(11);
     g.fillStyle = bump ? '#808080' : `rgb(${FABRIC} ${FABRIC} ${FABRIC})`;
@@ -203,13 +243,128 @@ function fabric(bump: boolean) {
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(30, 30);
   if (bump) t.colorSpace = THREE.NoColorSpace;
+  fabricCache.set(bump, t);
   return t;
+}
+
+// Bake: grille cloth with a coarser, rounder weave (64 threads to a 3.3 cm
+// tile, ~0.5 mm a thread), its height field as a normal map, fibre fuzz and
+// slubs on the colour. Tiles every 3.3 cm like the runtime cloth.
+let fabricBakeTex: { map: THREE.Texture; normal: THREE.Texture } | undefined;
+function fabricBake() {
+  if (fabricBakeTex) return fabricBakeTex;
+  const N = 512;
+  const slubs = (g: CanvasRenderingContext2D, dark: string, light: string) => {
+    const r = rng(41);
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = r() < 0.5 ? dark : light;
+      g.beginPath();
+      g.arc(r() * N, r() * N, 0.8 + r() * 2.4, 0, Math.PI * 2);
+      g.fill();
+    }
+    // Loose fibres lying across the weave.
+    g.lineWidth = 0.6;
+    for (let i = 0; i < 700; i++) {
+      const x = r() * N, y = r() * N, a = r() * Math.PI * 2, l = 3 + r() * 9;
+      g.strokeStyle = r() < 0.5 ? dark : light;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+      g.stroke();
+    }
+  };
+  const normal = dataTexture(
+    normalFromHeight(
+      greyCanvas(N, N, (g) => {
+        weaveHeight(g, N, 64);
+        slubs(g, 'rgba(0 0 0 / 0.12)', 'rgba(255 255 255 / 0.12)');
+      }),
+      2.2,
+    ),
+  );
+  const map = canvasTexture(N, N, (g) => {
+    g.fillStyle = `rgb(${FABRIC} ${FABRIC} ${FABRIC})`;
+    g.fillRect(0, 0, N, N);
+    g.globalCompositeOperation = 'overlay';
+    g.globalAlpha = 0.5;
+    weaveHeight(g, N, 64);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+    slubs(g, 'rgba(40 40 40 / 0.08)', 'rgba(255 255 255 / 0.09)');
+  });
+  for (const t of [map, normal]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(30, 30);
+  }
+  return (fabricBakeTex = { map, normal });
+}
+
+// Bake: the drivers behind the cloth as the faint shadows they cast through it:
+// a 4" woofer low and a tweeter above it, each a soft dark disc with a lighter
+// rim where the surround rolls. Metres on the grille face, x right, y up.
+function driverShadowTexture(w: number, h: number) {
+  const ppm = 3000;
+  const cw = Math.round(w * ppm), ch = Math.round(h * ppm);
+  return canvasTexture(cw, ch, (g) => {
+    g.clearRect(0, 0, cw, ch);
+    const X = (m: number) => (m / w + 0.5) * cw;
+    const Y = (m: number) => (0.5 - (m - H / 2) / h) * ch;
+    const disc = (x: number, y: number, r: number, a: number) => {
+      const gr = g.createRadialGradient(X(x), Y(y), r * ppm * 0.55, X(x), Y(y), r * ppm * 1.12);
+      gr.addColorStop(0, `rgba(20 20 20 / ${a})`);
+      gr.addColorStop(0.78, `rgba(20 20 20 / ${a * 0.8})`);
+      gr.addColorStop(1, 'rgba(20 20 20 / 0)');
+      g.fillStyle = gr;
+      g.beginPath();
+      g.arc(X(x), Y(y), r * ppm * 1.12, 0, Math.PI * 2);
+      g.fill();
+    };
+    // Woofer: surround, cone, dust cap.
+    disc(0, 0.092, 0.036, 0.075);
+    g.strokeStyle = 'rgba(255 255 255 / 0.05)';
+    g.lineWidth = 0.0016 * ppm;
+    g.beginPath();
+    g.arc(X(0), Y(0.092), 0.0345 * ppm, 0, Math.PI * 2);
+    g.stroke();
+    disc(0, 0.092, 0.011, 0.05);
+    // Tweeter and its waveguide.
+    disc(0, 0.186, 0.0185, 0.06);
+    disc(0, 0.186, 0.0085, 0.045);
+  });
+}
+
+// Bake: the side knob with a knurled grip band and a chamfered, dished face.
+function knobGeometryBake() {
+  const prof: [number, number][] = [
+    [0, 0.0095], [0.0054, 0.0095], [0.0064, 0.0092], [0.0069, 0.0086], [0.0069, 0.0032], [0.0073, 0.003],
+    [0.0082, 0.0029], [0.0084, 0.0022], [0.0084, 0],
+  ];
+  prof.reverse(); // base to top, so the faces point outward
+  const pts: THREE.Vector2[] = [];
+  for (let i = 0; i < prof.length - 1; i++) {
+    const [r0, h0] = prof[i], [r1, h1] = prof[i + 1];
+    const n = Math.max(1, Math.round(Math.hypot(r1 - r0, h1 - h0) / 0.0008));
+    for (let k = 0; k < n; k++) pts.push(new THREE.Vector2(r0 + ((r1 - r0) * k) / n, h0 + ((h1 - h0) * k) / n));
+  }
+  pts.push(new THREE.Vector2(prof[prof.length - 1][0], prof[prof.length - 1][1]));
+  const geo = new THREE.LatheGeometry(pts, 216);
+  const p = geo.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    if (y < 0.0034 || y > 0.0084 || Math.hypot(x, z) < 0.0065) continue;
+    const k = 1 + 0.04 * Math.cos(Math.atan2(z, x) * 36);
+    p.setXYZ(i, x * k, y, z * k);
+  }
+  geo.computeVertexNormals();
+  return geo;
 }
 
 // EDIFIER in bold condensed, wide-tracked silver capitals with a thin dark
 // edge, on a transparent 1024 x 205 canvas (crisp at close range).
+let wordmarkTex: THREE.Texture | undefined;
 function wordmarkTexture() {
-  return canvasTexture(1024, 205, (g) => {
+  if (wordmarkTex) return wordmarkTex;
+  return (wordmarkTex = canvasTexture(1024, 205, (g) => {
     g.clearRect(0, 0, 1024, 205);
     g.font = 'bold 200px Arial, Helvetica, sans-serif';
     g.textAlign = 'center';
@@ -237,7 +392,7 @@ function wordmarkTexture() {
     g.strokeText('EDIFIER', 0, 0);
     g.fillText('EDIFIER', 0, 0);
     g.restore();
-  });
+  }));
 }
 
 function labelTexture(text: string, w: number, h: number, font: string, color = '#c9c9c6') {
@@ -257,11 +412,15 @@ function labelTexture(text: string, w: number, h: number, font: string, color = 
 const PKW = 0.062;
 const PKH = 0.112;
 const KNOB_D = [0.05, 0.073, 0.096]; // knob centres below the cabinet top
+let pocketTex: THREE.Texture | undefined;
 function pocketTexture() {
+  if (pocketTex) return pocketTex;
   const s = 4000; // px per metre
   const w = Math.round(PKW * s);
   const h = Math.round(PKH * s);
-  return canvasTexture(w, h, (g) => {
+  const BK = bq(1, 2);
+  return (pocketTex = canvasTexture(w * BK, h * BK, (g) => {
+    g.scale(BK, BK);
     g.fillStyle = '#3e3e3e';
     g.fillRect(0, 0, w, h);
     // Scooped top and bottom: sloped faces, the lower one catching light.
@@ -346,7 +505,35 @@ function pocketTexture() {
     g.font = 'bold 9px Arial, sans-serif';
     g.fillText('Input indicator (LED)', kx, h - 46);
     ['RED   OPT/COA', 'BLUE   BT', 'GREEN   Line in1/2'].forEach((t, i) => g.fillText(t, kx, h - 37 + i * 9));
-  });
+  }));
+}
+
+export function prewarmSpeakerTextures(): (() => void)[] {
+  return [
+    () => {
+      stipple();
+      fabric(false);
+      fabric(true);
+      wordmarkTexture();
+      pocketTexture();
+    },
+    () => {
+      for (const seed of [3, 7]) {
+        woodGrain(H, D - GRILLE, seed + 1, 'map');
+        woodGrain(H, D - GRILLE, seed + 2, 'map');
+      }
+    },
+    () => {
+      for (const seed of [3, 7]) {
+        woodGrain(H, D - GRILLE, seed + 1, 'bump');
+        woodGrain(H, D - GRILLE, seed + 2, 'bump');
+        woodGrain(W, D - GRILLE, seed + 3, 'map');
+        woodGrain(W, D - GRILLE, seed + 3, 'bump');
+        woodGrain(W, D - GRILLE, seed + 4, 'map');
+        woodGrain(W, D - GRILLE, seed + 4, 'bump');
+      }
+    },
+  ];
 }
 
 // Print on the active speaker's back plate.
@@ -354,7 +541,9 @@ function backPlateTexture(w: number, h: number) {
   const s = 4000;
   const cw = Math.round(w * s);
   const ch = Math.round(h * s);
-  return canvasTexture(cw, ch, (g) => {
+  const BK = bq(1, 2);
+  return canvasTexture(cw * BK, ch * BK, (g) => {
+    g.scale(BK, BK);
     g.fillStyle = '#151515';
     g.fillRect(0, 0, cw, ch);
     g.strokeStyle = '#2a2a2a';
@@ -401,7 +590,7 @@ function knobGeometry() {
     new THREE.Vector2(0.0082, 0.0028),
     new THREE.Vector2(0.0084, 0),
   ];
-  return new THREE.LatheGeometry(pts, 32);
+  return new THREE.LatheGeometry(pts, sg(32));
 }
 
 export function buildSpeaker(side: 'left' | 'right' = 'left'): THREE.Group {
@@ -432,11 +621,11 @@ export function buildSpeaker(side: 'left' | 'right' = 'left'): THREE.Group {
     baffle,
     backMat,
   ];
-  const cab = mesh(new RoundedBoxGeometry(W, H, CD, 4, 0.008), mats);
+  const cab = mesh(new RoundedBoxGeometry(W, H, CD, sg(4), 0.008), mats);
   cab.position.set(0, H / 2, -GRILLE / 2);
   g.add(cab);
   // Black back panel inset in the wrap's rear edge.
-  batch.add(new RoundedBoxGeometry(W - 0.006, H - 0.006, BACK, 2, 0.006), backMat, [0, H / 2, -D / 2 + BACK / 2 - 0.0006]);
+  batch.add(new RoundedBoxGeometry(W - 0.006, H - 0.006, BACK, sg(2), 0.006), backMat, [0, H / 2, -D / 2 + BACK / 2 - 0.0006]);
 
   // The cloth grille over the whole front: a rounded-rectangle frame with
   // a soft cushioned edge, covered in light grey woven fabric.
@@ -450,22 +639,43 @@ export function buildSpeaker(side: 'left' | 'right' = 'left'): THREE.Group {
       bevelEnabled: true,
       bevelThickness: bev,
       bevelSize: bev,
-      bevelSegments: 4,
-      curveSegments: 8,
+      bevelSegments: sg(4),
+      curveSegments: sg(8),
     });
-    const cloth = new THREE.MeshStandardMaterial({
-      map: fabric(false),
-      bumpMap: fabric(true),
-      bumpScale: 0.5,
-      roughness: 0.95,
-    });
+    const cloth = bakeQuality()
+      ? // Woven grille cloth: the fuzz of the fibres reads as sheen.
+        new THREE.MeshPhysicalMaterial({
+          map: fabricBake().map,
+          normalMap: fabricBake().normal,
+          normalScale: new THREE.Vector2(1, 1),
+          roughness: 0.95,
+          sheen: 1,
+          sheenColor: new THREE.Color(0xdcdcd6),
+          sheenRoughness: 0.45,
+        })
+      : new THREE.MeshStandardMaterial({
+          map: fabric(false),
+          bumpMap: fabric(true),
+          bumpScale: 0.5,
+          roughness: 0.95,
+        });
     const m = mesh(geo, [cloth, cloth]);
     m.position.set(0, H / 2, zf - GRILLE + bev);
     g.add(m);
   }
+  if (bakeQuality()) {
+    // The drivers show faintly through the cloth.
+    const sw = W - 0.0126, sh = H - 0.0126;
+    const shade = new THREE.Mesh(
+      new THREE.PlaneGeometry(sw, sh),
+      new THREE.MeshStandardMaterial({ map: driverShadowTexture(sw, sh), transparent: true, roughness: 0.95, depthWrite: false }),
+    );
+    shade.position.set(0, H / 2, zf + 0.00006);
+    g.add(shade);
+  }
   // Thin chrome strip across the grille, a little above the middle.
   const stripMat = std(0xf6f6f4, 0.15, 0.1);
-  const strip = mesh(new RoundedBoxGeometry(W * 0.78, 0.0028, 0.0018, 1, 0.0009), stripMat, false);
+  const strip = mesh(new RoundedBoxGeometry(W * 0.78, 0.0028, 0.0018, sg(1), 0.0009), stripMat, false);
   strip.receiveShadow = false;
   strip.position.set(0, 0.125, zf + 0.0002);
   g.add(strip);
@@ -488,8 +698,8 @@ export function buildSpeaker(side: 'left' | 'right' = 'left'): THREE.Group {
   const zb = -D / 2 - 0.0006;
   if (!right) {
     // Passive speaker: spring-clip terminal plate low on the back.
-    batch.add(new RoundedBoxGeometry(0.036, 0.024, 0.003, 1, 0.001), satin, [0.004, 0.045, zb - 0.0015]);
-    batch.add(new RoundedBoxGeometry(0.026, 0.012, 0.007, 1, 0.0015), satin, [0.006, 0.047, zb - 0.0045]);
+    batch.add(new RoundedBoxGeometry(0.036, 0.024, 0.003, sg(1), 0.001), satin, [0.004, 0.045, zb - 0.0015]);
+    batch.add(new RoundedBoxGeometry(0.026, 0.012, 0.007, sg(1), 0.0015), satin, [0.006, 0.047, zb - 0.0045]);
     batch.add(new THREE.BoxGeometry(0.008, 0.005, 0.005), satin, [0.0, 0.039, zb - 0.007]);
     batch.add(new THREE.BoxGeometry(0.008, 0.005, 0.005), std(0xd42a1e, 0.5), [0.012, 0.039, zb - 0.007]);
   } else {
@@ -504,14 +714,14 @@ export function buildSpeaker(side: 'left' | 'right' = 'left'): THREE.Group {
     plate.rotation.y = Math.PI;
     plate.position.set(0, PY, zb - 0.0016);
     g.add(plate);
-    batch.add(new RoundedBoxGeometry(PW + 0.002, PH + 0.002, 0.0015, 1, 0.003), satin, [0, PY, zb - 0.0008]);
+    batch.add(new RoundedBoxGeometry(PW + 0.002, PH + 0.002, 0.0015, sg(1), 0.003), satin, [0, PY, zb - 0.0008]);
     // Positions in plate coordinates (u right as seen from behind, v up).
     const at = (u: number, v: number, d: number): THREE.Vector3Tuple => [-(u - PW / 2), PY + PH / 2 - v, zb - d];
     const back: THREE.Vector3Tuple = [-Math.PI / 2, 0, 0];
     // RCA pairs (LINE1, LINE2): white left, red right.
-    const rca = new THREE.CylinderGeometry(0.0046, 0.0046, 0.009, 16);
-    const insul = new THREE.CylinderGeometry(0.0028, 0.0028, 0.0092, 12);
-    const pin = new THREE.CylinderGeometry(0.0009, 0.0009, 0.0094, 6);
+    const rca = new THREE.CylinderGeometry(0.0046, 0.0046, 0.009, sg(16));
+    const insul = new THREE.CylinderGeometry(0.0028, 0.0028, 0.0092, sg(12));
+    const pin = new THREE.CylinderGeometry(0.0009, 0.0009, 0.0094, sg(6));
     const whiteM = std(0xe6e6e2, 0.5);
     const redM = std(0xc0201a, 0.5);
     for (const v of [0.028, 0.0405])
@@ -520,19 +730,36 @@ export function buildSpeaker(side: 'left' | 'right' = 'left'): THREE.Group {
         batch.add(insul, i === 0 ? whiteM : redM, at(u, v, 0.0047), back);
         batch.add(pin, metal, at(u, v, 0.0049), back);
       });
+    if (bakeQuality()) {
+      // Nickel barrels get thread ribs; the centre pins are gold-plated.
+      const gold = std(0xcaa44e, 0.24, 1);
+      for (const v of [0.028, 0.0405])
+        [0.072, 0.088].forEach((u) => {
+          for (let k = 0; k < 4; k++) batch.add(new THREE.TorusGeometry(0.0046, 0.00028, 6, 28), metal, at(u, v, 0.0011 + k * 0.0012));
+          batch.add(new THREE.CylinderGeometry(0.0007, 0.0007, 0.0006, 12), gold, at(u, v, 0.0098), back);
+        });
+      // Four pan-head screws holding the plate, with their crosses.
+      for (const [u, v] of [[0.006, 0.006], [PW - 0.006, 0.006], [0.006, PH - 0.006], [PW - 0.006, PH - 0.006]]) {
+        batch.add(new THREE.CylinderGeometry(0.0024, 0.0026, 0.0011, 20), metal, at(u, v, 0.0022), back);
+        batch.add(new THREE.BoxGeometry(0.0032, 0.00014, 0.0005), std(0x0a0a0a, 0.8), at(u, v, 0.0028), [0, 0, u * 90]);
+        batch.add(new THREE.BoxGeometry(0.0005, 0.00014, 0.0032), std(0x0a0a0a, 0.8), at(u, v, 0.0028), [0, 0, u * 90]);
+      }
+      // Strain-relief boot where the mains cord leaves its grommet.
+      batch.add(new THREE.CylinderGeometry(0.0034, 0.0056, 0.012, 24), satin, at(0.034, 0.093, 0.009), back);
+    }
     // Optical (square, shuttered) and coaxial (yellow).
-    batch.add(new RoundedBoxGeometry(0.009, 0.0085, 0.006, 1, 0.001), satin, at(0.085, 0.052, 0.003));
+    batch.add(new RoundedBoxGeometry(0.009, 0.0085, 0.006, sg(1), 0.001), satin, at(0.085, 0.052, 0.003));
     batch.add(rca, metal, at(0.085, 0.064, 0.0045), back);
     batch.add(insul, std(0xe8c21a, 0.5), at(0.085, 0.064, 0.0047), back);
     // Speaker-out spring clips.
-    batch.add(new RoundedBoxGeometry(0.03, 0.013, 0.008, 1, 0.0015), satin, at(0.031, 0.031, 0.004));
+    batch.add(new RoundedBoxGeometry(0.03, 0.013, 0.008, sg(1), 0.0015), satin, at(0.031, 0.031, 0.004));
     batch.add(new THREE.BoxGeometry(0.008, 0.005, 0.009), satin, at(0.025, 0.037, 0.0045));
     batch.add(new THREE.BoxGeometry(0.008, 0.005, 0.009), redM, at(0.038, 0.037, 0.0045));
     // Power rocker.
-    batch.add(new RoundedBoxGeometry(0.017, 0.011, 0.004, 1, 0.001), satin, at(0.034, 0.061, 0.002));
-    batch.add(new RoundedBoxGeometry(0.013, 0.008, 0.004, 1, 0.001), std(0x0a0a0a, 0.35), at(0.034, 0.061, 0.004), [0, 0.18, 0]);
+    batch.add(new RoundedBoxGeometry(0.017, 0.011, 0.004, sg(1), 0.001), satin, at(0.034, 0.061, 0.002));
+    batch.add(new RoundedBoxGeometry(0.013, 0.008, 0.004, sg(1), 0.001), std(0x0a0a0a, 0.35), at(0.034, 0.061, 0.004), [0, 0.18, 0]);
     // Mains cord through its grommet, dropping to the desk.
-    batch.add(new THREE.CylinderGeometry(0.005, 0.0055, 0.004, 16), satin, at(0.034, 0.093, 0.002), back);
+    batch.add(new THREE.CylinderGeometry(0.005, 0.0055, 0.004, sg(16)), satin, at(0.034, 0.093, 0.002), back);
     const cordCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(...at(0.034, 0.093, 0.003)),
       new THREE.Vector3(...at(0.034, 0.096, 0.02)),
@@ -541,7 +768,7 @@ export function buildSpeaker(side: 'left' | 'right' = 'left'): THREE.Group {
       new THREE.Vector3(-(0.03 - PW / 2), 0.003, zb - 0.06),
       new THREE.Vector3(-(0.02 - PW / 2), 0.003, zb - 0.075),
     ]);
-    batch.add(new THREE.TubeGeometry(cordCurve, 24, 0.0026, 8), std(0x0c0c0c, 0.5));
+    batch.add(new THREE.TubeGeometry(cordCurve, sg(24), 0.0026, sg(8)), std(0x0c0c0c, 0.5));
 
     // Control pocket on the outer (+x) side: a black moulded frame around a
     // recessed insert carrying treble, bass and volume/input, and the LED.
@@ -556,8 +783,8 @@ export function buildSpeaker(side: 'left' | 'right' = 'left'): THREE.Group {
         bevelEnabled: true,
         bevelThickness: 0.0006,
         bevelSize: 0.0006,
-        bevelSegments: 1,
-        curveSegments: 6,
+        bevelSegments: sg(1),
+        curveSegments: sg(6),
       });
       // Shape x -> -z, shape y -> y, extrude +z -> +x.
       batch.add(geo, satin, [xs - 0.0004, PCY, PZ], [0, Math.PI / 2, 0]);
@@ -572,30 +799,44 @@ export function buildSpeaker(side: 'left' | 'right' = 'left'): THREE.Group {
     g.add(insert);
     // Knobs: at 43% across the insert from its front edge.
     const kz = PZ + PKW / 2 - PKW * 0.43;
-    const knob = knobGeometry();
+    const knob = bakeQuality() ? knobGeometryBake() : knobGeometry();
     const tick = new THREE.BoxGeometry(0.0003, 0.0026, 0.0006);
     const angles = [0.1, -0.25, 0.6];
     KNOB_D.forEach((d, i) => {
       const y = H - d;
       batch.add(knob, knobMat, [xs + 0.0003, y, kz], [0, 0, -Math.PI / 2]);
       // Thin ring around the knob's base.
-      batch.add(new THREE.TorusGeometry(0.009, 0.0005, 6, 32), satin, [xs + 0.0006, y, kz], [0, Math.PI / 2, 0]);
+      batch.add(new THREE.TorusGeometry(0.009, 0.0005, sg(6), sg(32)), satin, [xs + 0.0006, y, kz], [0, Math.PI / 2, 0]);
       // Indicator notch on the knob face.
       const a = angles[i];
       batch.add(tick, std(0x4a4a48, 0.6), [xs + 0.0097, y + Math.cos(a) * 0.0038, kz + Math.sin(a) * 0.0038], [a, 0, 0]);
     });
     // The input LED below the volume knob (green: line in).
     const led = new THREE.Mesh(
-      new THREE.SphereGeometry(0.0016, 12, 6, 0, Math.PI),
-      new THREE.MeshStandardMaterial({ color: 0x0f3b1a, emissive: 0x2bff6a, emissiveIntensity: 0.9, roughness: 0.3 }),
+      new THREE.SphereGeometry(0.0016, sg(12), sg(6), 0, Math.PI),
+      bakeQuality()
+        ? new THREE.MeshPhysicalMaterial({ color: 0x3aff7a, roughness: 0.05, transmission: 0.85, thickness: 0.0012, ior: 1.52, attenuationColor: new THREE.Color(0x20ff60), attenuationDistance: 0.003, emissive: 0x2bff6a, emissiveIntensity: 0.5, side: THREE.DoubleSide })
+        : new THREE.MeshStandardMaterial({ color: 0x0f3b1a, emissive: 0x2bff6a, emissiveIntensity: bq(0.9, 6), roughness: 0.3 }),
     );
     led.rotation.y = Math.PI / 2;
     led.position.set(xs + 0.0003, H - 0.1095, kz);
     g.add(led);
+    if (bakeQuality()) {
+      const die = new THREE.Mesh(new THREE.SphereGeometry(0.0007, 14, 8), new THREE.MeshStandardMaterial({ color: 0x70ff9a, emissive: 0x2bff6a, emissiveIntensity: 12, roughness: 0.4 }));
+      die.name = 'lamp-input';
+      die.position.set(xs + 0.0008, H - 0.1095, kz);
+      g.add(die);
+      batch.add(new THREE.TorusGeometry(0.0019, 0.00035, 6, 28), std(0x151515, 0.45), [xs + 0.0004, H - 0.1095, kz], [0, Math.PI / 2, 0]);
+    }
   }
 
   // Four small rubber pads under the cabinet.
-  const pad = new THREE.CylinderGeometry(0.006, 0.006, 0.0015, 14);
+  const pad = bakeQuality()
+    ? new THREE.LatheGeometry(
+        ([[0, -0.00145], [0.0046, -0.00145], [0.0053, -0.0013], [0.006, -0.0006], [0.006, 0], [0, 0.00005]] as [number, number][]).map(([r, h]) => new THREE.Vector2(r, h)),
+        40,
+      )
+    : new THREE.CylinderGeometry(0.006, 0.006, 0.0015, sg(14));
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) batch.add(pad, rubber, [sx * (W / 2 - 0.015), -0.0007, sz * (D / 2 - 0.02)]);
 
   batch.flush(g);
