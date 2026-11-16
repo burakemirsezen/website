@@ -3,3 +3,5 @@ dist
 .astro
 .impeccable
 .git
+bake-assets
+src/assets/bake/master

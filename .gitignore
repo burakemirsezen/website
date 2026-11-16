@@ -5,3 +5,11 @@ dist/
 .impeccable/questions/
 .impeccable/review/
 .impeccable/live/
+
+# Offline plate bake: high-res source textures and 16-bit masters
+bake-assets/
+src/assets/bake/master/
+*.blend1
+*.blend2
+*.exr
+*.log

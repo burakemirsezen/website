@@ -601,75 +601,151 @@ const photos: Record<string, ImageMetadata | undefined> = {
       // Live trace and pod details in the cluster section.
       initClusterLive();
 
-      // On desktop, the listening room: a WebGL scene, fetched only when the
-      // section comes within a screen of view, so the top of the page never
-      // waits for it. While it loads the stage shows a quiet fill, and after
-      // 200 ms a breathing ember dot (kept at least 400 ms once shown, so it
-      // never flickers). The canvas fades in on its first frame. Without
-      // WebGL2, on any error, or with no first frame 8 s after the load
-      // started, the room is given up for this page view (a late load is
-      // thrown away) and the lists show instead, as on phones.
+      // On desktop, the listening room: a WebGL scene built on the side after
+      // the main page finishes loading, yielding in small idle slices so the
+      // rest of the site never waits or stalls. If the visitor scrolls within
+      // a screen of view before it finishes, it accelerates cleanly; after
+      // 200 ms waiting near view a breathing ember dot appears (kept at least
+      // 400 ms once shown, so it never flickers). Without WebGL2, on any error,
+      // or with no first frame 8 s after approaching, the room is given up for
+      // this page view (a late load is thrown away) and the lists show
+      // instead, as on phones.
       const stage = document.querySelector<HTMLElement>('.room-stage');
       const music = document.querySelector<HTMLElement>('#outside');
       if (stage && music && matchMedia('(min-width: 60.0625rem)').matches) {
         let state: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
-        let dispose: (() => void) | undefined;
+        let urgent = false;
+        let started = false;
+        let shownAt = 0;
         let showLoader = 0;
+        let revealTimer = 0;
+        let giveUp = 0;
+        let idleStart = 0;
+        let idleUsesCallback = false;
+        let dispose: (() => void) | undefined;
+        const abort = new AbortController();
+        const urgentListeners = new Set<() => void>();
+        let near: IntersectionObserver | undefined;
+
+        const clearIdleStart = () => {
+          if (!idleStart) return;
+          if (idleUsesCallback && typeof cancelIdleCallback === 'function') cancelIdleCallback(idleStart);
+          else clearTimeout(idleStart);
+          idleStart = 0;
+        };
+
+        const coverUrl = (img: HTMLImageElement) => {
+          if (img.currentSrc) return img.currentSrc;
+          const pick = img.srcset
+            .split(',')
+            .map((s) => s.trim().split(/\s+/))
+            .find(([, w]) => w === '640w');
+          return pick?.[0] || img.src;
+        };
+
         const fail = () => {
           if (state === 'failed' || state === 'ready') return;
           state = 'failed';
+          near?.disconnect();
           clearTimeout(showLoader);
+          clearTimeout(revealTimer);
+          clearTimeout(giveUp);
+          clearIdleStart();
+          abort.abort();
+          urgentListeners.clear();
           dispose?.();
           stage.classList.remove('is-loading', 'is-ready', 'has-gl');
           music.classList.add('room-failed');
         };
-        const load = async () => {
+
+        const reveal = () => {
+          if (state !== 'loading') return;
+          state = 'ready';
+          near?.disconnect();
+          clearTimeout(giveUp);
+          clearTimeout(showLoader);
+          clearIdleStart();
+          urgentListeners.clear();
+          const wait = shownAt ? Math.max(0, shownAt + 400 - performance.now()) : 0;
+          stage.classList.add('has-gl');
+          revealTimer = window.setTimeout(() => {
+            stage.classList.remove('is-loading');
+            stage.classList.add('is-ready');
+          }, wait);
+        };
+
+        const start = async () => {
+          if (started || state === 'failed' || state === 'ready') return;
+          started = true;
           state = 'loading';
-          let shownAt = 0;
-          showLoader = window.setTimeout(() => {
-            stage.classList.add('is-loading');
-            shownAt = performance.now();
-          }, 200);
-          const giveUp = setTimeout(fail, 8000);
-          const reveal = () => {
-            if (state !== 'loading') return;
-            state = 'ready';
-            clearTimeout(giveUp);
-            clearTimeout(showLoader);
-            const wait = shownAt ? Math.max(0, shownAt + 400 - performance.now()) : 0;
-            stage.classList.add('has-gl');
-            setTimeout(() => {
-              stage.classList.remove('is-loading');
-              stage.classList.add('is-ready');
-            }, wait);
-          };
+          clearIdleStart();
           try {
-            const { mountRoom } = await import('../scripts/room/scene');
-            if (state !== 'loading') return;
-            const covers = [...music.querySelectorAll<HTMLImageElement>('.records img')].map((img) => img.currentSrc || img.src);
-            const room = mountRoom(stage, {
+            const { mountPlateRoomAsync } = await import('../scripts/room/plate-room');
+            const covers = [...music.querySelectorAll<HTMLImageElement>('.records img')].map(coverUrl);
+            const room = await mountPlateRoomAsync(stage, {
               covers,
               reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+              isUrgent: () => urgent,
+              subscribeUrgent: (fn: () => void) => {
+                urgentListeners.add(fn);
+                return () => urgentListeners.delete(fn);
+              },
+              signal: abort.signal,
               onReady: reveal,
             });
+
+            if (abort.signal.aborted || state === 'failed') {
+              room?.dispose();
+              return;
+            }
+            if (!room) {
+              fail();
+              return;
+            }
             dispose = room.dispose;
-            if (state === 'failed') room.dispose();
           } catch {
-            fail();
+            if (!abort.signal.aborted) fail();
           }
         };
+
         if (!document.createElement('canvas').getContext('webgl2')) {
           fail();
         } else {
-          const near = new IntersectionObserver(
+          near = new IntersectionObserver(
             (entries, obs) => {
               if (!entries.some((e) => e.isIntersecting)) return;
               obs.disconnect();
-              load();
+              clearIdleStart();
+              if (state === 'ready' || state === 'failed') return;
+              urgent = true;
+              for (const fn of urgentListeners) fn();
+              urgentListeners.clear();
+              if (!showLoader) {
+                showLoader = window.setTimeout(() => {
+                  if (state === 'ready' || state === 'failed') return;
+                  stage.classList.add('is-loading');
+                  shownAt = performance.now();
+                }, 200);
+              }
+              if (!giveUp) giveUp = window.setTimeout(fail, 8000);
+              void start();
             },
             { rootMargin: '100% 0px' },
           );
           near.observe(stage);
+
+          const scheduleBackground = () => {
+            if (started || urgent || state !== 'idle') return;
+            if (typeof requestIdleCallback === 'function') {
+              idleUsesCallback = true;
+              idleStart = requestIdleCallback(() => void start(), { timeout: 1500 });
+            } else {
+              idleUsesCallback = false;
+              idleStart = window.setTimeout(() => void start(), 200);
+            }
+          };
+          if (document.readyState === 'complete') scheduleBackground();
+          else addEventListener('load', scheduleBackground, { once: true });
         }
       }
 

@@ -125,7 +125,7 @@ export const music: {
     placeholder?: boolean;
   }[];
 } = {
-  lead: 'Outside work I play the guitar and listen to records. Everything here is my own gear, modelled after the listening corner in my\u00a0flat.',
+  lead: 'Outside work I play the guitar and listen to records. The gear in this room is all\u00a0mine.',
   photos: [
     {
       id: 'guitar',

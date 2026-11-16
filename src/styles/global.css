@@ -989,7 +989,7 @@ h1 span {
 }
 
 /* The WebGL room's hover note: what the object is, next to it. Paper with
-   the system's 2px ink rule on top, no card. Placed by scene.ts. */
+   the system's 2px ink rule on top, no card. Placed by plate-room.ts. */
 .room-tip {
   position: absolute;
   top: 0;
